@@ -78,5 +78,14 @@ async function openDesk(){
  $('auth').hidden=true;$('desk').hidden=false;
  if(admin&&user.app_metadata?.worges_role!=='admin'){tell('Seu acesso administrativo precisa ser habilitado pela Worges.');$('search').parentElement.hidden=true;return}
  $('manager').hidden=!admin;reset();tell('');await loadProjects();
+ if(!admin && new URLSearchParams(location.search).has('orcamento')){
+  const pending=JSON.parse(sessionStorage.getItem('worges-orcamento')||'null');
+  if(!pending)return;
+  const {email,...pedido}=pending;
+  if(email!==user.email.toLowerCase()){tell('Entre com o mesmo e-mail informado no orçamento.');return}
+  const send=element('button','Enviar orçamento de '+pedido.titulo);
+  $('desk').prepend(send);
+  send.onclick=async()=>{send.disabled=true;try{await request('/rest/v1/rpc/registrar_orcamento','POST',pedido);sessionStorage.removeItem('worges-orcamento');sessionStorage.removeItem('worges-questionario-'+pedido.modalidade);send.remove();await loadProjects();tell('Orçamento enviado. Abra os arquivos da obra para anexar seu Word, PDF ou proposta de capa.')}catch(err){onError(err);send.disabled=false}};
+ }
 }
 if(session)(async()=>{remember(await(await request('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token})).json());await openDesk()})().catch(onError);
