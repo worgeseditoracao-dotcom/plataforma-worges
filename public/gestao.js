@@ -1,0 +1,82 @@
+'use strict';
+const host='https://rraitizanntzdurqdqkm.supabase.co';
+const key='sb_publishable_VvOy5B3haLBPS7sIyfZ9gg_bHiBRbiy';
+const admin=new URLSearchParams(location.search).get('area')==='admin';
+const $=id=>document.getElementById(id);
+const money=n=>(n/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
+const tell=text=>{$('msg').textContent=text};
+const onError=e=>tell(e.message||'Confira sua conexão e tente novamente.');
+let session=JSON.parse(sessionStorage.getItem('worges-login')||'null'), projects=[], editing=null;
+function remember(data){session=data;sessionStorage.setItem('worges-login',JSON.stringify(data));}
+async function request(path,method='GET',body,raw=false,extra={}){
+ const headers={apikey:key,...extra};
+ if(session?.access_token)headers.Authorization='Bearer '+session.access_token;
+ if(body && !raw)headers['Content-Type']='application/json';
+ const r=await fetch(host+path,{method,headers,body:raw?body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ if(!r.ok)throw Error(r.status===401?'Entre novamente para continuar.':r.status===403?'Sua conta não tem permissão para esta ação.':'Não foi possível concluir. Confira os dados e tente novamente.');
+ return r;
+}
+async function login(signup){
+ const f=$('login');if(!f.reportValidity())return;
+ const payload=Object.fromEntries(new FormData(f));
+ const r=await request(signup?'/auth/v1/signup':'/auth/v1/token?grant_type=password','POST',payload);
+ const result=await r.json();f.reset();
+ if(!result.access_token){tell('Confira seu e-mail para confirmar a conta e depois entre com sua senha.');return}
+ remember(result);await openDesk();
+}
+$('heading').textContent=admin?'Administração editorial':'Meus projetos';
+$('login').onsubmit=e=>{e.preventDefault();login(false).catch(onError)};
+$('signup').onclick=()=>login(true).catch(onError);
+$('logout').onclick=async()=>{try{await request('/auth/v1/logout','POST')}finally{sessionStorage.removeItem('worges-login');location.reload()}};
+const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['prazo','Prazo previsto','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
+for(const [name,title,type] of fields){
+ const label=element('label',title),input=document.createElement('input');input.name=name;input.type=type;
+ input.required=!['prazo','whatsapp'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
+ label.append(input);$('fields').append(label);
+}
+function reset(){editing=null;$('project').reset();$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
+$('reset').onclick=reset;
+$('project').onsubmit=async e=>{
+ e.preventDefault();const f=e.target,data=Object.fromEntries(new FormData(f));
+ data.email=data.email.trim().toLowerCase();data.pago_centavos=Math.round(Number(data.valor)*100);delete data.valor;
+ if(!data.prazo)data.prazo=null;
+ try{await request('/rest/v1/projetos_painel'+(editing?'?id=eq.'+editing:''),editing?'PATCH':'POST',data);reset();$('editor').open=false;await loadProjects();tell('Projeto salvo.')}catch(err){onError(err)}
+};
+async function allRows(path){
+ const result=[];for(let offset=0;;offset+=500){const rows=await(await request(path+'&limit=500&offset='+offset)).json();result.push(...rows);if(rows.length<500)return result;}
+}
+async function loadProjects(){projects=await allRows('/rest/v1/projetos_painel?select=*&order=data_projeto.desc,id');render();}
+function render(){
+ const list=$('list');list.replaceChildren();
+ const term=$('search').value.trim().toLocaleLowerCase();
+ const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
+ $('report').textContent=rows.length+' projeto(s) · Total pago '+money(rows.reduce((s,p)=>s+p.pago_centavos,0));
+ if(!rows.length)list.append(element('p','Nenhum projeto encontrado.'));
+ for(const p of rows){
+  const card=document.createElement('article');card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
+  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)$('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
+  const box=document.createElement('details');box.append(element('summary','Arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
+ }
+}
+$('search').oninput=render;
+async function details(p,content){
+ const notes=await allRows('/rest/v1/relato_projeto?select=texto,criado_em&projeto_id=eq.'+p.id+'&order=criado_em,id');
+ const files=[];for(let offset=0;;offset+=100){const batch=await(await request('/storage/v1/object/list/originais-worges','POST',{prefix:p.id,limit:100,offset,sortBy:{column:'name',order:'asc'}})).json();files.push(...batch);if(batch.length<100)break;}
+ content.replaceChildren(element('h3','Arquivos para download'));
+ for(const file of files){const name=file.name.replace(/^[0-9a-f-]{36}_/,'');const b=element('button','Baixar '+name);b.onclick=async()=>{try{const r=await request('/storage/v1/object/authenticated/originais-worges/'+p.id+'/'+encodeURIComponent(file.name));const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(err){onError(err)}};const row=document.createElement('p');row.append(b);content.append(row);}
+ if(!files.length)content.append(element('p','Nenhum arquivo enviado.'));
+ const upload=element('label','Anexar arquivos à obra');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
+ input.onchange=async()=>{input.disabled=true;try{for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');await request('/storage/v1/object/originais-worges/'+p.id+'/'+crypto.randomUUID()+'_'+clean,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}tell('Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
+ content.append(element('h3','Orientações e informações da obra'));
+ for(const n of notes)content.append(element('p',new Date(n.criado_em).toLocaleString('pt-BR')+' · '+n.texto));
+ const form=document.createElement('form'),label=element('label','Adicionar orientação'),area=document.createElement('textarea');area.required=true;area.maxLength=16000;label.append(area);const save=element('button','Registrar orientação');form.append(label,save);content.append(form);
+ form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await request('/rest/v1/relato_projeto','POST',{projeto_id:p.id,texto:area.value.trim()});await details(p,content);tell('Orientação registrada.')}catch(err){onError(err);save.disabled=false}};
+}
+async function openDesk(){
+ const user=await(await request('/auth/v1/user')).json();
+ $('auth').hidden=true;$('desk').hidden=false;
+ if(admin&&user.app_metadata?.worges_role!=='admin'){tell('Seu acesso administrativo precisa ser habilitado pela Worges.');$('search').parentElement.hidden=true;return}
+ $('manager').hidden=!admin;reset();tell('');await loadProjects();
+}
+if(session)(async()=>{remember(await(await request('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token})).json());await openDesk()})().catch(onError);
