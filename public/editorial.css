@@ -70,3 +70,47 @@ footer{font-size:13px;padding:36px 0}
 }
 @media(max-width:390px){.palette-label{max-width:145px}.swatches{max-width:150px}.hero h1{font-size:41px}.hero .actions .btn{width:100%}.hero,.hero-layout{min-height:780px}}
 @media(prefers-reduced-motion:reduce){.hero-cover{transition:none}.hero-cover-main{animation:none}.btn,.featured-card{transition:none}}
+
+/* Camadas de tinta e linhas de impressão da edição de novembro. */
+body #promoMes {
+  background:linear-gradient(100deg,#33155f,#81175f 63%,#4e1461);
+  color:white;text-align:center;padding:11px clamp(12px,3vw,42px);
+}
+body #promoMes strong {color:#ffea72}
+body #promoMes small {background:#fff4bd;color:#341543;border:0;font-weight:800}
+.hero {background:linear-gradient(115deg,#201142 12%,#382267 50%,#305bc0 82%,#189fbd)}
+.hero:after {background:linear-gradient(90deg,#21113feb 0%,#281345da 33%,#29134170 56%,transparent 78%)}
+.hero-glow {
+  background:radial-gradient(ellipse at 81% 17%,#ff539fa1,transparent 37%),radial-gradient(ellipse at 61% 74%,#15dfda9e,transparent 35%);
+}
+.hero-glow:after {
+  content:"";position:absolute;width:74%;height:100%;right:-10%;top:-39%;
+  border:2px solid #ffcaee70;border-radius:50%;transform:rotate(-24deg);
+  box-shadow:0 0 0 13px #fba4e321,0 0 0 27px #fba4e31c,0 0 0 44px #fba4e316,0 0 0 65px #fba4e312;
+}
+@media(prefers-reduced-motion:no-preference){.hero-glow{animation:ink-drift 11s ease-in-out infinite alternate}@keyframes ink-drift{to{transform:translate(-2%,3%) scale(1.04)}}}
+.hero h1 em {color:#ffcae4}
+.hero .btn:not(.outline) {color:#221335;background:#ffdf62;border-color:#ffdf62}
+.hero .btn:not(.outline):hover {background:#fff19c}
+.hero .eyebrow,.hero-foot {color:#ccefff}
+.hero-feature {background:#23143cde;border-color:#ecc6ff68}
+.featured-books {background:linear-gradient(135deg,#fbf7ff,#edf2ff 65%,#e4fbf8)}
+.featured-image {background:linear-gradient(145deg,#e9def8,#b5c4f2)}
+.featured-card:nth-child(3n+2) .featured-image {background:linear-gradient(145deg,#d4fbef,#91d6da)}
+.featured-card:nth-child(3n) .featured-image {background:linear-gradient(145deg,#ffe9ba,#f4c7cf)}
+#pacotes {background:#fffaf5}
+.campaign-banner {background:linear-gradient(110deg,#3e195e,#781758 70%,#92244a);border:0;border-left:8px solid #ffda60;color:white}
+.campaign-banner strong,.campaign-banner span {color:white}
+.package,.package.featured,.package:nth-child(3) {
+  --tinta:#087e90;--papel:#d3f7f3;border:1px solid #d9d6df;border-top:7px solid var(--tinta);
+  background:linear-gradient(157deg,var(--papel),white 46%);color:#211a34;
+}
+.package:nth-child(2){--tinta:#953c80;--papel:#f9dfef}
+.package:nth-child(3){--tinta:#a35e08;--papel:#ffedbe}
+.package .btn {background:var(--tinta);border-color:var(--tinta);color:white}
+.catalog {background:linear-gradient(110deg,#23133f,#462777 65%,#175580)}
+@media(max-width:700px){
+ .hero:after{background:linear-gradient(115deg,#20103fe8,#26123ba3 62%,#28113e61)}
+ .hero-cover-main{opacity:.57}
+ body #promoMes small{white-space:nowrap}
+}
