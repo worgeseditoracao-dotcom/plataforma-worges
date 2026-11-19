@@ -49,21 +49,36 @@ async function allRows(path){
 async function loadProjects(){projects=await allRows('/rest/v1/projetos_painel?select=*&order=data_projeto.desc,id');render();}
 function render(){
  const list=$('list');list.replaceChildren();
+ if(!admin){
+  const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
+  const section=element('section','');section.append(element('h2','Minhas compras'));
+  if(!purchases.length)section.append(element('p','Suas compras aparecerão aqui após a confirmação do pagamento.'));
+  for(const p of purchases){
+   const link=element('a',p.pacote+' · '+p.obra);link.href='#obra-'+p.id;
+   link.onclick=()=>{const detail=document.getElementById('obra-'+p.id)?.querySelector('details');if(detail)detail.open=true};
+   const line=element('p','');line.append(link,document.createTextNode(' · Pago '+money(p.pago_centavos)));section.append(line);
+  }
+  list.append(section,element('h2','Meus projetos e orçamentos'));
+ }
  const term=$('search').value.trim().toLocaleLowerCase();
  const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
  $('report').textContent=rows.length+' projeto(s) · Total pago '+money(rows.reduce((s,p)=>s+p.pago_centavos,0));
  if(!rows.length)list.append(element('p','Nenhum projeto encontrado.'));
  for(const p of rows){
-  const card=document.createElement('article');card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
+  const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
   if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)$('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
-  const box=document.createElement('details');box.append(element('summary','Arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
+  const box=document.createElement('details');box.append(element('summary','Etapas, arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
  }
 }
 $('search').oninput=render;
 async function details(p,content){
  const notes=await allRows('/rest/v1/relato_projeto?select=texto,criado_em&projeto_id=eq.'+p.id+'&order=criado_em,id');
  const files=[];for(let offset=0;;offset+=100){const batch=await(await request('/storage/v1/object/list/originais-worges','POST',{prefix:p.id,limit:100,offset,sortBy:{column:'name',order:'asc'}})).json();files.push(...batch);if(batch.length<100)break;}
- content.replaceChildren(element('h3','Arquivos para download'));
+ const history=await allRows('/rest/v1/historico_projeto?select=andamento,registrado_em&projeto_id=eq.'+p.id+'&order=registrado_em,id');
+ content.replaceChildren(element('h3','Histórico de etapas'));
+ const timeline=document.createElement('ol');
+ for(const event of history)timeline.append(element('li',new Date(event.registrado_em).toLocaleString('pt-BR')+' · '+event.andamento));
+ content.append(timeline,element('h3','Arquivos para download'));
  for(const file of files){const name=file.name.replace(/^[0-9a-f-]{36}_/,'');const b=element('button','Baixar '+name);b.onclick=async()=>{try{const r=await request('/storage/v1/object/authenticated/originais-worges/'+p.id+'/'+encodeURIComponent(file.name));const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(err){onError(err)}};const row=document.createElement('p');row.append(b);content.append(row);}
  if(!files.length)content.append(element('p','Nenhum arquivo enviado.'));
  const upload=element('label','Anexar arquivos à obra');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
