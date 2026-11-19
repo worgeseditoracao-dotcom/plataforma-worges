@@ -13,14 +13,20 @@ const inputs=[
  ['doi','Deseja DOI?',['Não','Sim, incluir no orçamento']],['abnt','Deseja normalização ABNT?',['Não','Sim, incluir no orçamento']],
  ['repasse','Orientações ou dúvidas sobre repasse (opcional)','textarea'],['extras','Informações adicionais','textarea']
 ];
+const sections={titulo:'Obra e autoria',email:'Contato do responsável',formato:'Formato e capa',doi:'Serviços e orientações'};
+let group;
 for(const [name,title,type] of inputs){
+ if(sections[name]){
+  group=document.createElement('fieldset');const heading=document.createElement('legend');
+  heading.textContent=sections[name];group.append(heading);document.querySelector('#perguntas').append(group);
+ }
  const label=document.createElement('label');label.textContent=title;
  const input=document.createElement(Array.isArray(type)?'select':type==='textarea'?'textarea':'input');input.name=name;
  if(Array.isArray(type)) for(const value of type)input.add(new Option(value,value));else if(type&&type!=='textarea')input.type=type;
  input.required=['titulo','responsavel','email','confirmacao','telefone'].includes(name);
  input.maxLength=type==='textarea'?1200:240;
  if(name==='telefone')input.pattern='[+0-9\\s\\(\\)\\-]{8,25}';
- label.append(input);document.querySelector('#perguntas').append(label);
+ label.append(input);group.append(label);
 }
 let draft;try{draft=JSON.parse(sessionStorage.getItem(draftKey))}catch{}
 if(draft)for(const [name] of inputs)fld[name].value=draft[name]??fld[name].value;

@@ -12,7 +12,7 @@ const chapterPackages = [
 
 export default function PublicationPage(){
   return <main className="publication-page">
-    <header className="site-header publication-header"><a className="brand brand-image" href="/"><img src="/worges-logo.png" alt="Worges Editoração"/></a><nav><a href="#livros">Livros</a><a href="#capitulos">Capítulos</a><a href="#academico">Autor Acadêmico</a><a href="#comparacao">Comparação</a></nav><a className="header-cta" href="/checkout">Contratar <span>↗</span></a></header>
+    <header className="site-header publication-header"><a className="selo-worges" href="/" aria-label="Worges Editoração · início"/><nav><a href="#livros">Livros</a><a href="#capitulos">Capítulos</a><a href="#academico">Autor Acadêmico</a><a href="#comparacao">Comparação</a></nav><a className="header-cta" href="/checkout">Contratar <span>↗</span></a></header>
 
     <section className="publication-hero"><p className="eyebrow">PACOTES E VALORES</p><h1>Escolha com clareza.<br/><em>Publique com segurança.</em></h1><p>Consulte todos os itens e preços antes de contratar. Nenhum cadastro é necessário para visualizar os valores.</p><div className="hero-actions"><a className="button primary" href="#comparacao">Comparar pacotes →</a><a className="button secondary" href="#capitulos">Publicar capítulo →</a></div></section>
 
