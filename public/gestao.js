@@ -88,4 +88,37 @@ async function openDesk(){
   send.onclick=async()=>{send.disabled=true;try{await request('/rest/v1/rpc/registrar_orcamento','POST',pedido);sessionStorage.removeItem('worges-orcamento');sessionStorage.removeItem('worges-questionario-'+pedido.modalidade);send.remove();await loadProjects();tell('Orçamento enviado. Abra os arquivos da obra para anexar seu Word, PDF ou proposta de capa.')}catch(err){onError(err);send.disabled=false}};
  }
 }
-if(session)(async()=>{remember(await(await request('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token})).json());await openDesk()})().catch(onError);
+
+async function googleLogin(){
+ const bytes=crypto.getRandomValues(new Uint8Array(48));
+ const encode=b=>btoa(String.fromCharCode(...b)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
+ const verifier=encode(bytes);
+ const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
+ sessionStorage.setItem('worges-verifier',verifier);
+ sessionStorage.setItem('worges-retorno',location.search);
+ const url=new URL(host+'/auth/v1/authorize');
+ url.search=new URLSearchParams({provider:'google',redirect_to:location.origin+'/gestao.html',code_challenge:encode(new Uint8Array(digest)),code_challenge_method:'s256'});
+ location.assign(url.href);
+}
+async function startDesk(){
+ const code=new URLSearchParams(location.search).get('code');
+ if(code){
+  const verifier=sessionStorage.getItem('worges-verifier');
+  const previous=sessionStorage.getItem('worges-retorno')||'';
+  history.replaceState(null,'','/gestao.html');
+  if(!verifier)throw Error('Inicie novamente o acesso com Google nesta aba.');
+  remember(await(await request('/auth/v1/token?grant_type=pkce','POST',{auth_code:code,code_verifier:verifier})).json());
+  sessionStorage.removeItem('worges-verifier');sessionStorage.removeItem('worges-retorno');
+  location.replace('/gestao.html'+(previous.startsWith('?')?previous:''));return;
+ }
+ if(session){
+  remember(await(await request('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token})).json());
+  await openDesk();return;
+ }
+ const config=await(await request('/auth/v1/settings')).json();
+ if(config.external?.google){
+  const google=element('button','Continuar com Google');google.type='button';
+  google.onclick=()=>googleLogin().catch(onError);$('auth').prepend(google);
+ }
+}
+startDesk().catch(onError);
