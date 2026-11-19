@@ -1,5 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build:vercel"
+  "buildCommand": "npm run build:vercel",
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/worges-inicio.html"
+    },
+    {
+      "source": "/catalogo",
+      "destination": "/catalogo.html"
+    },
+    {
+      "source": "/capitulos",
+      "destination": "/capitulos.html"
+    }
+  ]
 }
