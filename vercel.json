@@ -4,16 +4,19 @@
   "buildCommand": "npm run build:vercel",
   "rewrites": [
     {
-      "source": "/",
-      "destination": "/worges-inicio.html"
-    },
-    {
       "source": "/catalogo",
       "destination": "/catalogo.html"
     },
     {
       "source": "/capitulos",
       "destination": "/capitulos.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/worges-inicio.html",
+      "permanent": false
     }
   ]
 }
