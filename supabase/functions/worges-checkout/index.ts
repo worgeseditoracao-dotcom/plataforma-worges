@@ -40,9 +40,13 @@ Deno.serve(async req=>{
  }
  if(b.acao==='consultar')return reply({total,teste:test});
  if(b.acao!=='confirmar'||!/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(b.id))return reply({error:'Pedido inválido.'},400);
+ const bearer=req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
+ if(!bearer)return reply({error:'Entre na sua conta antes de confirmar o pedido.'},401);
+ const {data:{user},error:authError}=await db.auth.getUser(bearer);
+ if(authError||!user?.email_confirmed_at||!user.email)return reply({error:'Confirme seu e-mail e entre novamente.'},401);
  if(!test&&!Deno.env.get('INFINITEPAY_API_KEY'))return reply({error:'Pagamento em ativação. Nenhuma cobrança foi iniciada.'},503);
  if(test&&total!==0||!test&&total<100)return reply({error:'Valor indisponível.'},400);
- const email=test?null:String(b.email||'').trim().toLowerCase();
+ const email=test?null:user.email.trim().toLowerCase();
  if(!test&&(!email||email.length>254||!/^\S+@\S+\.\S+$/.test(email)))return reply({error:'Informe um e-mail válido.'},400);
  const {error:e}=await db.from('checkout_infinitepay').upsert({id:b.id,pacote:b.pacote,valor:total,email,cupom:coupon||null,teste:test},{onConflict:'id',ignoreDuplicates:true});
  if(e)throw e;

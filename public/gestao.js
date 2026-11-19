@@ -100,7 +100,44 @@ async function googleLogin(){
  url.search=new URLSearchParams({provider:'google',redirect_to:location.origin+'/gestao.html',code_challenge:encode(new Uint8Array(digest)),code_challenge_method:'s256'});
  location.assign(url.href);
 }
+function offerRecovery(){
+ const button=element('button','Esqueci minha senha');button.type='button';
+ $('login').append(button);
+ button.onclick=async()=>{
+  const email=$('login').elements.email;
+  if(!email.reportValidity())return;
+  button.disabled=true;
+  try{
+   await request('/auth/v1/recover?redirect_to='+encodeURIComponent(location.origin+'/gestao.html'),'POST',{email:email.value.trim()});
+   tell('Se esse e-mail estiver cadastrado, você receberá um link para escolher outra senha. Confira também o spam.');
+  }catch(err){onError(err)}finally{button.disabled=false}
+ };
+}
+async function recoveryForm(token){
+ $('login').hidden=true;
+ const form=document.createElement('form');
+ form.innerHTML='<h2>Escolha uma nova senha</h2><label>Nova senha<input name="nova" type="password" minlength="8" required autocomplete="new-password"></label><label>Confirme a nova senha<input name="confirmar" type="password" minlength="8" required autocomplete="new-password"></label><button>Salvar nova senha</button>';
+ $('auth').append(form);
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  if(form.elements.nova.value!==form.elements.confirmar.value){tell('As senhas precisam ser iguais.');return}
+  const button=form.querySelector('button');button.disabled=true;
+  try{
+   await request('/auth/v1/user','PUT',{password:form.elements.nova.value},false,{Authorization:'Bearer '+token});
+   form.remove();$('login').hidden=false;tell('Senha atualizada. Entre com o e-mail e a nova senha.');
+  }catch{tell('Não foi possível atualizar a senha. Solicite outro link de recuperação.');form.remove();$('login').hidden=false}
+ };
+}
 async function startDesk(){
+ offerRecovery();
+ const fragment=new URLSearchParams(location.hash.slice(1));
+ if(fragment.has('error')||fragment.get('type')==='recovery'){
+  history.replaceState(null,'',location.pathname+location.search);
+  session=null;sessionStorage.removeItem('worges-login');
+  if(fragment.get('type')==='recovery'&&fragment.has('access_token'))await recoveryForm(fragment.get('access_token'));
+  else tell('Este link expirou ou é inválido. Use Esqueci minha senha para solicitar outro.');
+  return;
+ }
  const code=new URLSearchParams(location.search).get('code');
  if(code){
   const verifier=sessionStorage.getItem('worges-verifier');
