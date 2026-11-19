@@ -114,3 +114,36 @@ body #promoMes small {background:#fff4bd;color:#341543;border:0;font-weight:800}
  .hero-cover-main{opacity:.57}
  body #promoMes small{white-space:nowrap}
 }
+
+.package [data-package="Bronze"] {
+  --metal-base:#662c20; --metal-light:#984726; --metal-shine:#ec844e88;
+}
+.package [data-package="Prata"] {
+  --metal-base:#233454; --metal-light:#476487; --metal-shine:#86bbf6aa;
+}
+.package [data-package="Ouro"] {
+  --metal-base:#583408; --metal-light:#84560e; --metal-shine:#ffc447aa;
+}
+#pacotes .package .btn[data-package] {
+  color:white;
+  background:linear-gradient(112deg,var(--metal-base) 8%,var(--metal-light) 44%,var(--metal-base) 85%) 0% 50% / 180% 100%;
+  border:1px solid var(--metal-light);
+  box-shadow:inset 0 1px #ffffff44,0 3px 8px #24152422;
+  transition:background-position .42s ease,box-shadow .3s ease,transform .2s ease;
+}
+@media(hover:hover){
+  #pacotes .package .btn[data-package]:hover {
+    transform:translateY(-2px);background-position:100% 50%;
+    box-shadow:inset 0 1px #ffffff66,0 5px 19px var(--metal-shine);
+  }
+}
+#pacotes .package .btn[data-package]:focus-visible {
+  outline:3px solid var(--metal-base);outline-offset:3px;
+  background-position:100% 50%;box-shadow:0 3px 18px var(--metal-shine);
+}
+#pacotes .package .btn[data-package]:active {
+  transform:translateY(1px);background-position:100% 50%;box-shadow:0 0 12px var(--metal-shine);
+}
+@media(prefers-reduced-motion:reduce){
+  #pacotes .package .btn[data-package]{transition:none;transform:none}
+}
