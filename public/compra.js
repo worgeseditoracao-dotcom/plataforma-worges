@@ -9,6 +9,7 @@ if(Object.hasOwn(rates,pack)){
  const key='compra-worges-'+pack;
  const saved=JSON.parse(sessionStorage.getItem(key)||'{}');
  const ouro=pack==='Ouro';
+ el('adicionais').querySelector('p').textContent=(ouro?'O e-book Kindle em EPUB já faz parte do Ouro. ':'')+'Todos os adicionais são opcionais e realizados com auxílio de IA e supervisão humana.';
  const extras=[
   ['doi','Registro DOI via Crossref',4000,'Identificador permanente da obra. A Worges aceita até 10 pessoas nos créditos de cada registro.'],
   ['abnt','Normalização ABNT',12990,'Padronização da apresentação do texto, das citações e das referências.'],
@@ -24,7 +25,7 @@ if(Object.hasOwn(rates,pack)){
   const note=document.createElement('p');note.textContent=descricao;el('extras').append(label,note);
  }
  const formatos=ouro?[['0','E-book Kindle incluído',0],['4990','E-book incluído + adaptação para impresso',4990]]:
- [['0','Sem arquivos Amazon KDP',0],['ebook','Somente e-book Kindle',9990],['fisico','Somente arquivo para livro físico',9990],['ambos','E-book + arquivo físico (economia de R$ 39,90)',15990]];
+ [['0','Não quero arquivos para Amazon',0],['ebook','Somente e-book Kindle',9990],['fisico','Somente arquivo para livro físico',9990],['ambos','E-book + arquivo físico (economia de R$ 39,90)',15990]];
  for(const [id,nome,valor] of formatos)el('kdp').add(new Option(nome+(valor?' · '+dinheiro(valor):''),id));
  el('faixa').value=saved.faixa==='300'?'300':'150';el('kdp').value=formatos.some(f=>f[0]===saved.kdp)?saved.kdp:'0';
  function atualizar(){
