@@ -53,31 +53,44 @@ async function allRows(path){
  const result=[];for(let offset=0;;offset+=500){const rows=await(await request(path+'&limit=500&offset='+offset)).json();result.push(...rows);if(rows.length<500)return result;}
 }
 async function loadProjects(){projects=await allRows('/rest/v1/projetos_painel?select=*&order=data_projeto.desc,id');render();}
+function botaoCertificado(p){
+ const b=element('button','Gerar certificado em PDF');let chave=crypto.randomUUID();
+ b.onclick=async()=>{b.disabled=true;try{
+ const r=await fetch(host+'/functions/v1/certificado-obra',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:key,'Content-Type':'application/json'},body:JSON.stringify({projeto:p.id,chave})});
+ if(!r.ok){const e=await r.json().catch(()=>({}));throw Error(e.mensagem||'Falha na emissão. Tente novamente.')}
+ const url=URL.createObjectURL(await r.blob());const a=element('a','');a.href=url;a.download='Certificado Worges - '+p.obra+'.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);tell('Certificado gerado.');chave=crypto.randomUUID();
+ }catch(e){onError(e)}finally{b.disabled=false}};return b;
+}
+window.addEventListener('hashchange',()=>{if(session&&!admin)render()});
 function render(){
  const list=$('list');list.replaceChildren();
  if(!admin){
-  const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
-  const section=element('section','');section.append(element('h2','Pacotes contratados'));
-  if(!purchases.length){
-   section.append(element('p','Você ainda não tem pacotes contratados.'));
-   const browse=element('a','Conhecer os pacotes de publicação');browse.href='/#pacotes';section.append(browse);
+  const view=['livros','certificados','pacotes'].includes(location.hash.slice(1))?location.hash.slice(1):'pacotes';
+  const style=document.createElement('style');style.textContent='.portal-nav,.portal-ofertas{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}.portal-nav a,.portal-ofertas a{padding:14px 18px;border-radius:12px;text-decoration:none;font-weight:700}.portal-nav a{background:white;color:#4a205c;border:1px solid #d5bddb}.portal-nav a[aria-current=page]{background:#52245e;color:white}.portal-ofertas a{flex:1 1 150px;display:grid;gap:10px;color:white!important;background:linear-gradient(125deg,#80432a,#64324d);box-shadow:0 9px 22px #36133420}.portal-ofertas a:nth-child(2){background:linear-gradient(125deg,#374a74,#21637b)}.portal-ofertas a:nth-child(3){background:linear-gradient(125deg,#75450a,#805325)}.portal-ofertas strong{font:600 26px Georgia}.portal-ofertas span{font-size:14px}';list.append(style);
+  const nav=document.createElement('nav');nav.className='portal-nav';nav.setAttribute('aria-label','Área do autor');
+  for(const [key,label] of [['pacotes','Meus pacotes'],['livros','Meus livros e projetos'],['certificados','Meus certificados']]){
+   const a=element('a',label);a.href='#'+key;if(key===view)a.setAttribute('aria-current','page');nav.append(a);
   }
-  for(const p of purchases){
-   const link=element('a',p.pacote+' · '+p.obra);link.href='#obra-'+p.id;
-   link.onclick=()=>{const detail=document.getElementById('obra-'+p.id)?.querySelector('details');if(detail)detail.open=true};
-   const line=element('p','');line.append(link,document.createTextNode(' · Pago '+money(p.pago_centavos)));section.append(line);
+  list.append(nav);$('search').parentElement.hidden=view!=='livros'||!projects.length;
+  if(view==='pacotes'){
+   const section=element('section','');section.append(element('h2','Pacotes contratados'));
+   const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
+   if(!purchases.length)section.append(element('p','Escolha o pacote para a sua próxima obra.'));
+   for(const p of purchases){section.append(element('p',p.pacote+' · '+p.obra+' · Pago '+money(p.pago_centavos)))}
+   const offers=element('div','');offers.className='portal-ofertas';
+   for(const [name,desc] of [['Bronze','Publicação digital'],['Prata','Digital e impressão'],['Ouro','Revisão e Kindle incluídos']]){
+    const a=element('a','');a.href='/pedido.html?pacote='+name;a.append(element('strong',name),element('span',desc),element('span','Escolher pacote →'));offers.append(a)
+   }
+   section.append(offers);list.append(section);return;
   }
-  const cert=element('section','');cert.append(element('h2','Meus certificados'));
-  const publicados=projects.filter(p=>/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()));
-  if(!publicados.length)cert.append(element('p','A emissão fica disponível quando a equipe registra a publicação da sua obra. A primeira emissão é gratuita.'));
-  for(const p of publicados){
-   const b=element('button','Solicitar certificado · '+p.obra);
-   b.onclick=async()=>{b.disabled=true;try{await request('/rest/v1/relato_projeto','POST',{projeto_id:p.id,texto:'O autor solicita a emissão do certificado desta publicação.'});b.textContent='Solicitação registrada · '+p.obra;tell('Solicitação registrada para a equipe editorial.')}catch(err){b.disabled=false;onError(err)}};
-   cert.append(b);
+  if(view==='certificados'){
+   const section=element('section','');section.append(element('h2','Certificados de publicação'),element('p','Primeira emissão gratuita por obra. Reemissão: R$ 29,90.'));
+   const obras=projects.filter(p=>/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()));
+   if(!obras.length)section.append(element('p','Quando sua obra estiver publicada e vinculada ao catálogo, você poderá gerar o PDF aqui.'));
+   for(const p of obras){section.append(element('h3',p.obra),botaoCertificado(p))}
+   list.append(section);return;
   }
-  list.append(section,cert,element('h2','Meus livros e projetos'));
-  $('search').parentElement.hidden=projects.length===0;
- 
+  list.append(element('h2','Meus livros e projetos'));
  }
  const term=$('search').value.trim().toLocaleLowerCase();
  const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
@@ -85,6 +98,7 @@ function render(){
  if(!rows.length)list.append(element('p',projects.length?'Nenhuma obra corresponde à busca.':'Você ainda não tem obras cadastradas. Aqui poderá acompanhar as etapas de cada livro e acessar seus arquivos.'));
  for(const p of rows){
   const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
+  if(admin&&/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()))card.append(botaoCertificado(p));
   if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)$('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
   const box=document.createElement('details');box.append(element('summary','Etapas, arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
  }
