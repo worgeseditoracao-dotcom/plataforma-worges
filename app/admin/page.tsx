@@ -1,2 +1,5 @@
 import { redirect } from 'next/navigation';
-export default function Page(){ redirect('/gestao.html?area=admin'); }
+
+export default function Page() {
+  redirect('/administracao.html');
+}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Painel administrativo · Worges Editoração</title>
+  <link rel="stylesheet" href="/administracao.css">
+  <script defer src="/gestao.js"></script>
+</head>
+<body data-area="admin">
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="/" aria-label="Worges Editoração, início">
+        <span class="brand-mark" aria-hidden="true">W</span> Worges Editoração
+      </a>
+      <span class="top-label">Administração editorial</span>
+      <button id="logout" class="secondary" hidden>Sair</button>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1 id="heading">Painel administrativo</h1>
+    <p id="msg" role="status" aria-live="polite" tabindex="-1"></p>
+    <section id="auth" class="login-card" aria-labelledby="access-heading">
+      <h2 id="access-heading">Acesso da equipe editorial</h2>
+      <form id="login">
+        <label>E-mail<input name="email" required type="email" autocomplete="username"></label>
+        <label>Senha<input name="password" required type="password" autocomplete="current-password"></label>
+        <button>Entrar no painel</button>
+      </form>
+    </section>
+    <div id="desk" hidden>
+      <div id="manager" hidden>
+        <nav id="admin-nav" class="views" aria-label="Seções do painel">
+          <button type="button" data-view="projetos" aria-pressed="true">Projetos</button>
+          <button type="button" data-view="cronograma" aria-pressed="false">Cronograma</button>
+          <button type="button" data-view="financeiro" aria-pressed="false">Financeiro</button>
+          <button type="button" id="new-project" class="new-project">Cadastrar projeto</button>
+        </nav>
+        <div id="report" class="metrics" aria-label="Resumo dos registros filtrados"></div>
+        <details id="editor" class="panel">
+          <summary id="editor-title">Cadastrar projeto</summary>
+          <form id="project">
+            <div class="grid" id="fields"></div>
+            <div class="actions"><button>Salvar projeto</button> <button type="button" id="reset" class="secondary">Limpar</button></div>
+          </form>
+        </details>
+      </div>
+      <div class="panel grid filters" id="filters">
+        <label>Buscar por obra, autor, contato ou pacote<input id="search" type="search"></label>
+        <label>Mês do registro<select id="filter-month"><option value="todos">Todos os meses</option></select></label>
+        <label>Tipo de publicação<select id="filter-kind">
+          <option value="todos">Livros e capítulos</option><option value="livro">Livros</option><option value="capitulo">Capítulos</option>
+        </select></label>
+        <label>Situação comercial<select id="filter-status">
+          <option value="todos">Todas as situações</option><option value="pago">Pagamento confirmado</option>
+          <option value="proposta">Proposta</option><option value="em_andamento_anterior">Projeto anterior</option><option value="a_conferir">A conferir</option>
+        </select></label>
+      </div>
+      <div id="list"></div>
+    </div>
+  </main>
+</body>
+</html>
