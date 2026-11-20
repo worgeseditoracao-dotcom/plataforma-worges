@@ -11,7 +11,10 @@ const sessionKey = admin ? 'worges-admin-login' : 'worges-login';
 const $=id=>document.getElementById(id);
 const money=n=>(n/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
-const tell=text=>{$('msg').textContent=text};
+const tell=text=>{
+ const status = admin && $('project-details')?.open ? $('project-details-status') : $('msg');
+ status.textContent=text;
+};
 const onError=e=>tell(e.message||'Confira sua conexão e tente novamente.');
 let session=JSON.parse(sessionStorage.getItem(sessionKey)||'null'), projects=[], editing=null;
 function remember(data){session=data;sessionStorage.setItem(sessionKey,JSON.stringify(data));}
@@ -41,13 +44,67 @@ $('heading').textContent=admin?'Painel administrativo':'Meus projetos';
 $('login').onsubmit=e=>{e.preventDefault();login(false).catch(onError)};
 if ($('signup')) $('signup').onclick=()=>login(true).catch(onError);
 $('logout').onclick=async()=>{try{await request('/auth/v1/logout','POST')}finally{sessionStorage.removeItem(sessionKey);location.reload()}};
-const fields=[['obra','Título da obra ou capítulo','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['tipo_projeto','Tipo de publicação','select'],['situacao_comercial','Situação comercial','select'],['pacote','Pacote ou modalidade','text'],['data_projeto','Data do projeto ou atividade documentada','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['revisao_enviada_em','Revisão enviada ao autor (inicia a pausa)','date'],['revisao_devolvida_em','Resposta do autor recebida (retoma o prazo)','date'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago confirmado (R$)','number'],['orcado','Valor da proposta (R$)','number'],['referencia_origem','Referência da informação (e-mail ou registro)','text']];
-for(const [name,title,type] of fields){
- const label=element('label',title),input=document.createElement(type==='select'?'select':'input');input.name=name;if(type!=='select')input.type=type;
- if(name==='tipo_projeto')for(const [value,text] of [['livro','Livro'],['capitulo','Capítulo de livro']])input.add(new Option(text,value));
- if(name==='situacao_comercial')for(const [value,text] of [['a_conferir','Dados a conferir'],['proposta','Proposta sem pagamento confirmado'],['pago','Pagamento confirmado'],['em_andamento_anterior','Projeto anterior em andamento']])input.add(new Option(text,value));
- input.required=!['revisao_enviada_em','revisao_devolvida_em','prazo','whatsapp','original_final_em','revisao_adicional','orcado','referencia_origem'].includes(name);if(['valor','orcado'].includes(name)){input.min='0';input.step='0.01'}
- label.append(input);$('fields').append(label);
+const stages = {
+ aguardando_original:'Aguardando original', triagem:'Em triagem', correcao:'Em correção',
+ revisao:'Em revisão', diagramacao:'Em diagramação', capa:'Em produção de capa',
+ aguardando_autor:'Aguardando retorno do autor', ajustes_finais:'Em ajustes finais',
+ finalizada:'Finalizada', publicada:'Publicada', pausada:'Pausada'
+};
+const sends = [
+ ['capa_enviada_em','Capa enviada'],
+ ['revisao_enviada_em','Revisão enviada'],
+ ['prova_enviada_em','Prova diagramada enviada'],
+ ['arquivos_finais_enviados_em','Arquivos finais enviados']
+];
+const groups = [
+ ['Dados da obra',[
+  ['obra','Título da obra ou capítulo','text'], ['autor','Nome do autor','text'],
+  ['email','E-mail de acesso do autor','email'], ['whatsapp','WhatsApp com DDD','tel',true],
+  ['tipo_projeto','Tipo de publicação','select'], ['data_projeto','Data de registro','date'],
+  ['referencia_origem','Referência da informação','text',true]
+ ]],
+ ['Acompanhamento editorial',[
+  ['etapa_editorial','Etapa da obra','select',true], ['andamento','Observações do andamento','text'],
+  ['original_final_em','Recebimento do original final','date',true], ['finalizacao_prevista_em','Finalização prevista','date',true],
+  ['prazo','Publicação prevista pela equipe','date',true], ['revisao_adicional','Revisão adicional contratada','checkbox',true]
+ ]],
+ ['Envios ao autor',[
+  ...sends.map(([name,label]) => [name,label+(name==='revisao_enviada_em'?' (inicia a pausa)':''),'date',true]),
+  ['revisao_devolvida_em','Resposta da revisão (retoma o prazo)','date',true]
+ ]],
+ ['Comercial',[
+  ['pacote','Pacote ou modalidade','text'], ['situacao_comercial','Situação comercial','select'],
+  ['valor','Valor pago confirmado (R$)','number'], ['orcado','Valor da proposta (R$)','number',true]
+ ]]
+];
+const fields = groups.flatMap(([,entries])=>entries);
+const choices = {
+ tipo_projeto:[['livro','Livro'],['capitulo','Capítulo de livro']],
+ situacao_comercial:[['a_conferir','Dados a conferir'],['proposta','Proposta sem pagamento confirmado'],['pago','Pagamento confirmado'],['em_andamento_anterior','Projeto anterior em andamento']],
+ etapa_editorial:[['','A definir'],...Object.entries(stages)]
+};
+if (admin) {
+ for (const [heading,entries] of groups) {
+  const group = element('fieldset','');
+  group.className = 'editor-group';
+  group.append(element('legend',heading));
+  const grid = element('div','');
+  grid.className = 'grid';
+  for (const [name,title,type,optional] of entries) {
+   const label = element('label',title);
+   const input = document.createElement(type === 'select' ? 'select' : 'input');
+   input.name = name;
+   if (choices[name]) for (const [value,text] of choices[name]) input.add(new Option(text,value));
+   else input.type = type;
+   input.required = !optional;
+   if (type === 'number') { input.min = '0'; input.step = '0.01'; }
+   label.append(input);
+   grid.append(label);
+  }
+  group.append(grid);
+  $('fields').append(group);
+ }
+ for (const [key,label] of choices.etapa_editorial) $('filter-stage').add(new Option(label,key || 'a_definir'));
 }
 function reset(){editing=null;if(admin)$('editor-title').textContent='Cadastrar projeto';HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.orcado.value='';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
 $('reset').onclick=reset;
@@ -59,7 +116,7 @@ $('project').onsubmit=async e=>{
   return;
  }
  data.valor_orcado_centavos=data.orcado===''?null:Math.round(Number(data.orcado)*100);delete data.orcado;
- for(const key of ['revisao_enviada_em','revisao_devolvida_em'])data[key]=data[key]||null;
+ for(const key of ['etapa_editorial','finalizacao_prevista_em','revisao_devolvida_em',...sends.map(([name])=>name)])data[key]=data[key]||null;
  if(!data.prazo)data.prazo=null;if(!data.original_final_em)data.original_final_em=null;data.revisao_adicional=f.elements.revisao_adicional.checked;
  try{await request('/rest/v1/projetos_painel'+(editing?'?id=eq.'+editing:''),editing?'PATCH':'POST',data);reset();$('editor').open=false;await loadProjects();tell('Projeto salvo.')}catch(err){onError(err)}
 };
@@ -80,6 +137,7 @@ function calendario(rows){
  const section=element('section','');section.append(element('h2',admin?'Cronograma editorial da equipe':'Meu cronograma editorial'));
  const eventos=[];
  for(const p of rows){const c=p.cronograma;
+ if(admin && p.finalizacao_prevista_em)eventos.push({data:p.finalizacao_prevista_em,obra:p.obra,nome:'Finalização prevista'});
  if(!c){
   if(p.prazo)eventos.push({data:p.prazo,obra:p.obra,nome:'Publicação prevista'});
   continue;
@@ -144,9 +202,50 @@ function editProject(project) {
  form.elements.obra.focus();
 }
 
+function compactText(tag, value) {
+ const text = element(tag,value);
+ text.className = 'cell-text';
+ text.title = value;
+ return text;
+}
+
+function latestSend(project) {
+ return sends.filter(([name])=>project[name]).sort(([a],[b])=>project[b].localeCompare(project[a]))[0];
+}
+
+function showProjectDetails(project) {
+ const dialog = $('project-details');
+ const root = $('project-details-content');
+ $('project-details-title').textContent = project.obra;
+ $('project-details-status').textContent = '';
+ const contact = [project.email,project.whatsapp].filter(Boolean).join(' · ');
+ const content = element('div','Carregando arquivos e etapas…');
+ const dates = element('dl','');
+ dates.className = 'project-dates';
+ const items = [
+  ['Etapa editorial',stages[project.etapa_editorial] || 'A definir'],
+  ['Finalização prevista',dateLabel(project.finalizacao_prevista_em)],
+  ...sends.map(([name,label])=>[label,dateLabel(project[name])])
+ ];
+ for (const [name,value] of items) {
+  const item = element('div','');
+  item.append(element('dt',name),element('dd',value));
+  dates.append(item);
+ }
+ root.replaceChildren(dates,element('p',project.andamento));
+ if (contact) root.append(element('p',contact));
+ if (project.referencia_origem) root.append(element('p','Origem: ' + project.referencia_origem));
+ if (isPublished(project)) root.append(botaoCertificado(project));
+ root.append(content);
+ dialog.showModal();
+ details(project,content).catch(() => {
+  content.textContent = 'Não foi possível carregar os arquivos e as etapas. Reabra os detalhes para tentar novamente.';
+ });
+}
+
 function projectsTable(rows) {
  const section = element('section','');
- section.append(element('h2','Projetos editoriais'));
+ section.append(element('h2','Projetos editoriais'),element('p','Ordem de registro: mais recentes primeiro.'));
  const scroll = element('div','');
  scroll.className = 'table-scroll';
  scroll.tabIndex = 0;
@@ -155,85 +254,72 @@ function projectsTable(rows) {
  const table = element('table','');
  table.className = 'projects-table';
  table.setAttribute('aria-label','Projetos editoriais');
- const columns = ['Obra','Autor','Contato','Tipo','Pacote','Situação comercial','Registro','Publicação prevista','Proposta','Recebido','Ações'];
+ const columns = [
+  ['Ações',10],['Registro',7],['Obra',19],['Etapa editorial',12],['Finalização prevista',10],
+  ['Último envio ao autor',12],['Autor',12],['Contato',16],['Tipo',9],['Pacote',13],
+  ['Situação comercial',13],['Publicação prevista',11],['Proposta',7],['Recebido',7]
+ ];
+ table.style.width = columns.reduce((total,[,width])=>total+width,0) + 'rem';
+ const colgroup = element('colgroup','');
  const header = table.createTHead().insertRow();
- for (const title of columns) {
+ for (const [title,width] of columns) {
+  const col = element('col','');
+  col.style.width = width + 'rem';
+  colgroup.append(col);
   const cell = element('th',title);
   cell.scope = 'col';
+  if (title === 'Registro') cell.setAttribute('aria-sort','descending');
   header.append(cell);
  }
+ table.prepend(colgroup);
  const body = table.createTBody();
- let activeDetails;
- for (const project of rows) {
+ for (const project of [...rows].sort((a,b)=>b.data_projeto.localeCompare(a.data_projeto))) {
   const row = body.insertRow();
-  const title = element('th',project.obra);
+  const buttons = element('div','');
+  buttons.className = 'row-actions';
+  const files = element('button','Arquivos');
+  files.setAttribute('aria-label','Arquivos e detalhes de ' + project.obra);
+  files.setAttribute('aria-haspopup','dialog');
+  files.onclick = () => showProjectDetails(project);
+  const edit = element('button','Editar');
+  edit.className = 'secondary';
+  edit.setAttribute('aria-label','Editar ' + project.obra);
+  edit.onclick = () => editProject(project);
+  buttons.append(files,edit);
+  row.insertCell().append(buttons);
+  row.insertCell().textContent = dateLabel(project.data_projeto);
+  const title = element('th','');
   title.scope = 'row';
+  title.append(compactText('span',project.obra));
   row.append(title);
-  row.insertCell().textContent = project.autor;
+  row.insertCell().append(compactText('span',stages[project.etapa_editorial] || 'A definir'));
+  row.insertCell().textContent = dateLabel(project.finalizacao_prevista_em);
+  const sent = latestSend(project);
+  const last = sent ? dateLabel(project[sent[0]]) + ' · ' + sent[1] : '—';
+  row.insertCell().append(compactText('span',last));
+  row.insertCell().append(compactText('span',project.autor));
   const contacts = row.insertCell();
-  contacts.className = 'project-contacts';
   const email = project.email?.trim();
   const phone = project.whatsapp?.trim();
   if (email) {
-   const link = element('a',email);
+   const link = compactText('a',email);
    link.href = 'mailto:' + encodeURIComponent(email);
    contacts.append(link);
   }
-  if (phone) contacts.append(element('span','WhatsApp: ' + phone));
+  if (phone) contacts.append(compactText('span','WhatsApp: ' + phone));
   if (!email && !phone) contacts.textContent = '—';
   row.insertCell().textContent = projectType(project);
-  row.insertCell().textContent = project.pacote;
-  const status = element('span',situacaoLabel[project.situacao_comercial] || 'Dados a conferir');
-  status.className = 'project-status';
+  row.insertCell().append(compactText('span',project.pacote));
+  const status = compactText('span',situacaoLabel[project.situacao_comercial] || 'Dados a conferir');
+  status.classList.add('project-status');
   status.dataset.status = project.situacao_comercial || 'a_conferir';
   row.insertCell().append(status);
-  row.insertCell().textContent = dateLabel(project.data_projeto);
   const publication = project.cronograma?.publicacao || project.prazo;
   row.insertCell().textContent = project.cronograma?.pausado ? 'Pausada' : dateLabel(publication);
   row.insertCell().textContent = project.valor_orcado_centavos == null ? '—' : money(project.valor_orcado_centavos);
   row.insertCell().textContent = project.situacao_comercial === 'pago'
    ? (project.pago_centavos > 0 ? money(project.pago_centavos) : 'A informar')
    : '—';
-  const buttons = element('div','');
-  buttons.className = 'row-actions';
-  const edit = element('button','Editar');
-  edit.className = 'secondary';
-  edit.setAttribute('aria-label','Editar ' + project.obra);
-  edit.onclick = () => editProject(project);
-  const toggle = element('button','Arquivos e detalhes');
-  toggle.setAttribute('aria-label','Arquivos e detalhes de ' + project.obra);
-  toggle.setAttribute('aria-expanded','false');
-  const detailRow = body.insertRow();
-  detailRow.id = 'detalhes-' + project.id;
-  detailRow.hidden = true;
-  const cell = detailRow.insertCell();
-  cell.colSpan = columns.length;
-  cell.className = 'project-detail';
-  toggle.setAttribute('aria-controls',detailRow.id);
-  toggle.onclick = async () => {
-   const wasOpen = !detailRow.hidden;
-   if (activeDetails) {
-    activeDetails.row.hidden = true;
-    activeDetails.button.setAttribute('aria-expanded','false');
-    activeDetails = null;
-   }
-   if (wasOpen) return;
-   activeDetails = {row:detailRow,button:toggle};
-   detailRow.hidden = false;
-   toggle.setAttribute('aria-expanded','true');
-   const contact = [project.email,project.whatsapp].filter(Boolean).join(' · ');
-   const content = element('div','');
-   cell.replaceChildren(element('h3',project.obra),element('p',project.andamento));
-   if (contact) cell.append(element('p',contact));
-   if (project.referencia_origem) cell.append(element('p','Origem: ' + project.referencia_origem));
-   if (isPublished(project)) cell.append(botaoCertificado(project));
-   content.textContent = 'Carregando etapas e arquivos…';
-   cell.append(content);
-   try { await details(project,content); }
-   catch { content.textContent = 'Não foi possível carregar as etapas e os arquivos. Feche e reabra os detalhes para tentar novamente.'; }
-  };
-  buttons.append(toggle,edit);
-  row.insertCell().append(buttons);
  }
  scroll.append(table);
  section.append(scroll);
@@ -365,10 +451,12 @@ function render(){
  const month = admin ? $('filter-month').value : 'todos';
  const kind = admin ? $('filter-kind').value : 'todos';
  const status = admin ? $('filter-status').value : 'todos';
+ const stage = admin ? $('filter-stage').value : 'todos';
  const rows = projects.filter(p =>
   (month === 'todos' || p.data_projeto.startsWith(month)) &&
   (kind === 'todos' || (p.tipo_projeto || 'livro') === kind) &&
   (status === 'todos' || p.situacao_comercial === status) &&
+  (stage === 'todos' || (p.etapa_editorial || 'a_definir') === stage) &&
   [p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento,p.referencia_origem].join(' ').toLocaleLowerCase().includes(term)
  );
  if (admin) renderMetrics(rows);
@@ -397,7 +485,7 @@ if (admin) {
   for (const item of views) item.setAttribute('aria-pressed', String(item === button));
   render();
  };
- for (const id of ['filter-month','filter-kind','filter-status']) $(id).onchange = render;
+ for (const id of ['filter-month','filter-kind','filter-status','filter-stage']) $(id).onchange = render;
  $('new-project').onclick = () => {
   reset();
   $('editor').open = true;
@@ -405,9 +493,12 @@ if (admin) {
  };
 }
 async function details(p,content){
- const notes=await allRows('/rest/v1/relato_projeto?select=texto,criado_em&projeto_id=eq.'+p.id+'&order=criado_em,id');
+ const notesPath = '/rest/v1/relato_projeto?select=texto,criado_em&projeto_id=eq.'+p.id+'&order=criado_em,id';
  const files=[];for(let offset=0;;offset+=100){const batch=await(await request('/storage/v1/object/list/originais-worges','POST',{prefix:p.id,limit:100,offset,sortBy:{column:'name',order:'asc'}})).json();files.push(...batch);if(batch.length<100)break;}
- const history=await allRows('/rest/v1/historico_projeto?select=andamento,registrado_em&projeto_id=eq.'+p.id+'&order=registrado_em,id');
+ const historyPath = '/rest/v1/historico_projeto?select=andamento,registrado_em&projeto_id=eq.'+p.id+'&order=registrado_em,id';
+ const [notesResult,historyResult] = await Promise.allSettled([allRows(notesPath),allRows(historyPath)]);
+ const notes = notesResult.status === 'fulfilled' ? notesResult.value : [];
+ const history = historyResult.status === 'fulfilled' ? historyResult.value : [];
  content.replaceChildren();
  const timeline=document.createElement('ol');
  for(const event of history)timeline.append(element('li',new Date(event.registrado_em).toLocaleString('pt-BR')+' · '+event.andamento));
@@ -441,6 +532,7 @@ async function details(p,content){
  }
  if (!files.length && !hasChapterOriginal) content.append(element('p','Nenhum arquivo enviado à plataforma para este projeto.'));
  if (admin) content.append(element('h3','Histórico de etapas'),timeline);
+ if (historyResult.status === 'rejected') content.append(element('p','Histórico indisponível no momento.'));
  if (!admin) content.append(element('p','Envie o original final em Word ou PDF em até um ano após a contratação. Você também pode anexar a capa. Depois de enviar o original final, entregue o questionário editorial em até dois dias.'));
  if((p.checkout_id||p.pago_centavos>0)&&!admin){
  const pack=p.pacote.split(' ')[0];
@@ -450,6 +542,7 @@ async function details(p,content){
  const upload=element('label',admin?'Anexar arquivo ao projeto':'Anexar original, capa ou questionário preenchido');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
  input.onchange=async()=>{input.disabled=true;try{let original;if(final.checked&&![...input.files].some(f=>/\.(docx?|pdf)$/i.test(f.name)))throw Error('Selecione um original em Word ou PDF.');for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');const path=p.id+'/'+crypto.randomUUID()+'_'+clean;if(final.checked&&/\.(docx?|pdf)$/i.test(clean))original=path;await request('/storage/v1/object/originais-worges/'+path,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}if(original){await request('/rest/v1/rpc/confirmar_original_final','POST',{projeto:p.id,arquivo:original});await loadProjects()}tell(original?'Original recebido. Cronograma atualizado.':'Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
  content.append(element('h3','Orientações e informações da obra'));
+ if (notesResult.status === 'rejected') content.append(element('p','Orientações indisponíveis no momento.'));
  for(const n of notes)content.append(element('p',new Date(n.criado_em).toLocaleString('pt-BR')+' · '+n.texto));
  const form=document.createElement('form'),label=element('label',admin?'Registrar orientação visível ao autor':'Adicionar orientação ou completar o questionário editorial'),area=document.createElement('textarea');area.required=true;area.maxLength=16000;label.append(area);const save=element('button','Registrar orientação');form.append(label,save);content.append(form);
  form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await request('/rest/v1/relato_projeto','POST',{projeto_id:p.id,texto:area.value.trim()});await details(p,content);tell('Orientação registrada.')}catch(err){onError(err);save.disabled=false}};

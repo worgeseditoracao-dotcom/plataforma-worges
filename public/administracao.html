@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Painel administrativo · Worges Editoração</title>
-  <link rel="stylesheet" href="/administracao.css">
-  <script defer src="/gestao.js"></script>
+  <link rel="stylesheet" href="/administracao.css?v=editorial-20261120">
+  <script defer src="/gestao.js?v=editorial-20261120"></script>
 </head>
 <body data-area="admin">
   <header class="top">
@@ -42,7 +42,7 @@
         <details id="editor" class="panel">
           <summary id="editor-title">Cadastrar projeto</summary>
           <form id="project">
-            <div class="grid" id="fields"></div>
+            <div id="fields"></div>
             <div class="actions"><button>Salvar projeto</button> <button type="button" id="reset" class="secondary">Limpar</button></div>
           </form>
         </details>
@@ -53,12 +53,21 @@
         <label>Tipo de publicação<select id="filter-kind">
           <option value="todos">Livros e capítulos</option><option value="livro">Livros</option><option value="capitulo">Capítulos</option>
         </select></label>
+        <label>Etapa editorial<select id="filter-stage"><option value="todos">Todas as etapas</option></select></label>
         <label>Situação comercial<select id="filter-status">
           <option value="todos">Todas as situações</option><option value="pago">Pagamento confirmado</option>
           <option value="proposta">Proposta</option><option value="em_andamento_anterior">Projeto anterior</option><option value="a_conferir">A conferir</option>
         </select></label>
       </div>
       <div id="list"></div>
+      <dialog id="project-details" aria-labelledby="project-details-title">
+        <div class="dialog-heading">
+          <h2 id="project-details-title">Arquivos do projeto</h2>
+          <form method="dialog"><button class="secondary" autofocus>Fechar</button></form>
+        </div>
+        <p id="project-details-status" role="status"></p>
+        <div id="project-details-content"></div>
+      </dialog>
     </div>
   </main>
 </body>
