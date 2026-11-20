@@ -41,7 +41,7 @@ for(const [name,title,type] of fields){
  input.required=!['prazo','whatsapp'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
  label.append(input);$('fields').append(label);
 }
-function reset(){editing=null;$('project').reset();$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
+function reset(){editing=null;HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
 $('reset').onclick=reset;
 $('project').onsubmit=async e=>{
  e.preventDefault();const f=e.target,data=Object.fromEntries(new FormData(f));
@@ -57,19 +57,32 @@ function render(){
  const list=$('list');list.replaceChildren();
  if(!admin){
   const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
-  const section=element('section','');section.append(element('h2','Minhas compras'));
-  if(!purchases.length)section.append(element('p','Suas compras aparecerão aqui após a confirmação do pagamento.'));
+  const section=element('section','');section.append(element('h2','Pacotes contratados'));
+  if(!purchases.length){
+   section.append(element('p','Você ainda não tem pacotes contratados.'));
+   const browse=element('a','Conhecer os pacotes de publicação');browse.href='/#pacotes';section.append(browse);
+  }
   for(const p of purchases){
    const link=element('a',p.pacote+' · '+p.obra);link.href='#obra-'+p.id;
    link.onclick=()=>{const detail=document.getElementById('obra-'+p.id)?.querySelector('details');if(detail)detail.open=true};
    const line=element('p','');line.append(link,document.createTextNode(' · Pago '+money(p.pago_centavos)));section.append(line);
   }
-  list.append(section,element('h2','Meus projetos e orçamentos'));
+  const cert=element('section','');cert.append(element('h2','Meus certificados'));
+  const publicados=projects.filter(p=>/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()));
+  if(!publicados.length)cert.append(element('p','A emissão fica disponível quando a equipe registra a publicação da sua obra. A primeira emissão é gratuita.'));
+  for(const p of publicados){
+   const b=element('button','Solicitar certificado · '+p.obra);
+   b.onclick=async()=>{b.disabled=true;try{await request('/rest/v1/relato_projeto','POST',{projeto_id:p.id,texto:'O autor solicita a emissão do certificado desta publicação.'});b.textContent='Solicitação registrada · '+p.obra;tell('Solicitação registrada para a equipe editorial.')}catch(err){b.disabled=false;onError(err)}};
+   cert.append(b);
+  }
+  list.append(section,cert,element('h2','Meus livros e projetos'));
+  $('search').parentElement.hidden=projects.length===0;
+ 
  }
  const term=$('search').value.trim().toLocaleLowerCase();
  const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
  $('report').textContent=rows.length+' projeto(s) · Total pago '+money(rows.reduce((s,p)=>s+p.pago_centavos,0));
- if(!rows.length)list.append(element('p','Nenhum projeto encontrado.'));
+ if(!rows.length)list.append(element('p',projects.length?'Nenhuma obra corresponde à busca.':'Você ainda não tem obras cadastradas. Aqui poderá acompanhar as etapas de cada livro e acessar seus arquivos.'));
  for(const p of rows){
   const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
   if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)$('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
@@ -104,7 +117,7 @@ async function openDesk(){
  const comprar=new URLSearchParams(location.search).get('comprar');if(!admin&&['Bronze','Prata','Ouro'].includes(comprar)){location.replace('/pedido.html?pacote='+comprar);return}
  $('auth').hidden=true;$('desk').hidden=false;
  if(admin&&user.app_metadata?.worges_role!=='admin'){tell('Seu acesso administrativo precisa ser habilitado pela Worges.');$('search').parentElement.hidden=true;return}
- $('manager').hidden=!admin;reset();tell('');await loadProjects();
+ $('manager').hidden=!admin;if(admin)reset();tell('');await loadProjects();
  if(!admin && new URLSearchParams(location.search).has('orcamento')){
   const pending=JSON.parse(sessionStorage.getItem('worges-orcamento')||'null');
   if(!pending)return;
