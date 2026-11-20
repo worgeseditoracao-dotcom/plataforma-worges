@@ -155,7 +155,7 @@ function projectsTable(rows) {
  const table = element('table','');
  table.className = 'projects-table';
  table.setAttribute('aria-label','Projetos editoriais');
- const columns = ['Obra','Autor','Tipo','Pacote','Situação comercial','Registro','Publicação prevista','Proposta','Recebido','Ações'];
+ const columns = ['Obra','Autor','Contato','Tipo','Pacote','Situação comercial','Registro','Publicação prevista','Proposta','Recebido','Ações'];
  const header = table.createTHead().insertRow();
  for (const title of columns) {
   const cell = element('th',title);
@@ -170,6 +170,17 @@ function projectsTable(rows) {
   title.scope = 'row';
   row.append(title);
   row.insertCell().textContent = project.autor;
+  const contacts = row.insertCell();
+  contacts.className = 'project-contacts';
+  const email = project.email?.trim();
+  const phone = project.whatsapp?.trim();
+  if (email) {
+   const link = element('a',email);
+   link.href = 'mailto:' + encodeURIComponent(email);
+   contacts.append(link);
+  }
+  if (phone) contacts.append(element('span','WhatsApp: ' + phone));
+  if (!email && !phone) contacts.textContent = '—';
   row.insertCell().textContent = projectType(project);
   row.insertCell().textContent = project.pacote;
   const status = element('span',situacaoLabel[project.situacao_comercial] || 'Dados a conferir');
@@ -177,8 +188,8 @@ function projectsTable(rows) {
   status.dataset.status = project.situacao_comercial || 'a_conferir';
   row.insertCell().append(status);
   row.insertCell().textContent = dateLabel(project.data_projeto);
-  row.insertCell().textContent = dateLabel(project.cronograma?.pausado ? null : (project.cronograma?.publicacao || project.prazo));
-  if (project.cronograma?.pausado) row.cells[6].textContent = 'Pausada';
+  const publication = project.cronograma?.publicacao || project.prazo;
+  row.insertCell().textContent = project.cronograma?.pausado ? 'Pausada' : dateLabel(publication);
   row.insertCell().textContent = project.valor_orcado_centavos == null ? '—' : money(project.valor_orcado_centavos);
   row.insertCell().textContent = project.situacao_comercial === 'pago'
    ? (project.pago_centavos > 0 ? money(project.pago_centavos) : 'A informar')
@@ -189,8 +200,8 @@ function projectsTable(rows) {
   edit.className = 'secondary';
   edit.setAttribute('aria-label','Editar ' + project.obra);
   edit.onclick = () => editProject(project);
-  const toggle = element('button','Detalhes');
-  toggle.setAttribute('aria-label','Detalhes de ' + project.obra);
+  const toggle = element('button','Arquivos e detalhes');
+  toggle.setAttribute('aria-label','Arquivos e detalhes de ' + project.obra);
   toggle.setAttribute('aria-expanded','false');
   const detailRow = body.insertRow();
   detailRow.id = 'detalhes-' + project.id;
@@ -277,7 +288,7 @@ function projectCharts(rows) {
  grid.append(
   barChart('Livros e capítulos',[['Livros',rows.length - chapters],['Capítulos',chapters]]),
   barChart('Situação comercial',[...status].map(([key,value]) => [situacaoLabel[key],value])),
-  barChart('Valor recebido por mês de registro dos projetos',valuesByMonth,money)
+  barChart('Valor recebido identificado por mês de registro',valuesByMonth,money)
  );
  section.append(grid);
  return section;
@@ -397,14 +408,17 @@ async function details(p,content){
  const notes=await allRows('/rest/v1/relato_projeto?select=texto,criado_em&projeto_id=eq.'+p.id+'&order=criado_em,id');
  const files=[];for(let offset=0;;offset+=100){const batch=await(await request('/storage/v1/object/list/originais-worges','POST',{prefix:p.id,limit:100,offset,sortBy:{column:'name',order:'asc'}})).json();files.push(...batch);if(batch.length<100)break;}
  const history=await allRows('/rest/v1/historico_projeto?select=andamento,registrado_em&projeto_id=eq.'+p.id+'&order=registrado_em,id');
- content.replaceChildren(element('h3','Histórico de etapas'));
+ content.replaceChildren();
  const timeline=document.createElement('ol');
  for(const event of history)timeline.append(element('li',new Date(event.registrado_em).toLocaleString('pt-BR')+' · '+event.andamento));
- content.append(timeline,element('h3','Arquivos para download'));
+ if (admin) content.append(element('h3','Arquivos para download'));
+ else content.append(element('h3','Histórico de etapas'),timeline,element('h3','Arquivos para download'));
  for(const file of files){const name=file.name.replace(/^[0-9a-f-]{36}_/,'');const b=element('button','Baixar '+name);b.onclick=async()=>{try{const r=await request('/storage/v1/object/authenticated/originais-worges/'+p.id+'/'+encodeURIComponent(file.name));const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(err){onError(err)}};const row=document.createElement('p');row.append(b);content.append(row);}
+ let hasChapterOriginal = false;
  if (admin && p.pedido_capitulo_id) {
   const [order] = await allRows('/rest/v1/pedidos_capitulo?select=arquivo,paginas,abnt,revisao&id=eq.' + p.pedido_capitulo_id);
-  if (order) {
+  if (order?.arquivo) {
+   hasChapterOriginal = true;
    const extras = [order.abnt && 'Normalização ABNT',order.revisao && 'Correção ortográfica'].filter(Boolean);
    content.append(element('p',order.paginas + ' páginas · ' + (extras.join(' · ') || 'Sem serviços adicionais')));
    const download = element('button','Baixar original da submissão');
@@ -425,7 +439,8 @@ async function details(p,content){
    content.append(download);
   }
  }
- if(!files.length && !(admin && p.pedido_capitulo_id))content.append(element('p','Nenhum arquivo enviado.'));
+ if (!files.length && !hasChapterOriginal) content.append(element('p','Nenhum arquivo enviado à plataforma para este projeto.'));
+ if (admin) content.append(element('h3','Histórico de etapas'),timeline);
  if (!admin) content.append(element('p','Envie o original final em Word ou PDF em até um ano após a contratação. Você também pode anexar a capa. Depois de enviar o original final, entregue o questionário editorial em até dois dias.'));
  if((p.checkout_id||p.pago_centavos>0)&&!admin){
  const pack=p.pacote.split(' ')[0];
