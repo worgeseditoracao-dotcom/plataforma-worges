@@ -73,7 +73,7 @@ function render(){
   }
   list.append(nav);$('search').parentElement.hidden=view!=='livros'||!projects.length;
   if(view==='pacotes'){
-   const section=element('section','');section.append(element('h2','Pacotes contratados'));
+   const section=element('section','');section.append(element('h2','Meus pacotes'));
    const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
    if(!purchases.length)section.append(element('p','Escolha o pacote para a sua próxima obra.'));
    for(const p of purchases){section.append(element('p',p.pacote+' · '+p.obra+' · Pago '+money(p.pago_centavos)))}
@@ -81,7 +81,11 @@ function render(){
    for(const [name,desc] of [['Bronze','Publicação digital'],['Prata','Digital e impressão'],['Ouro','Revisão e Kindle incluídos']]){
     const a=element('a','');a.href='/pedido.html?pacote='+name;a.append(element('strong',name),element('span',desc),element('span','Escolher pacote →'));offers.append(a)
    }
-   section.append(offers);list.append(section);return;
+   section.append(offers);
+   const coletaneas=element('section','');
+   coletaneas.append(element('h2','Coletâneas'),element('h3','Publicar um capítulo de livro'),element('p','Nesta modalidade, seu capítulo integra um livro com trabalhos de outros autores. As condições para envio dos capítulos serão divulgadas aqui.'));
+   const acervo=element('a','Conhecer as coletâneas publicadas →');acervo.href='/capitulos.html';coletaneas.append(acervo);
+   list.append(section,coletaneas);return;
   }
   if(view==='certificados'){
    const section=element('section','');section.append(element('h2','Certificados de publicação'),element('p','Primeira emissão gratuita por obra. Reemissão: R$ 29,90.'));
