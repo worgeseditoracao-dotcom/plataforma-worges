@@ -7,6 +7,10 @@ let session;
 try { session = JSON.parse(sessionStorage.getItem('worges-login') || 'null'); } catch { session = null; }
 if (session?.access_token) document.querySelector('#account').hidden = true;
 
+if (new URLSearchParams(location.search).get('modalidade') === 'urgente') {
+ form.elements.modalidade.value = 'urgente';
+ document.querySelector('#total').textContent = format.format(197.90);
+}
 form.addEventListener('change', () => {
  orderId = undefined;
  const {modalidade, abnt, revisao} = form.elements;
