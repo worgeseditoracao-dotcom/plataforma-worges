@@ -81,11 +81,12 @@ async function details(p,content){
  content.append(timeline,element('h3','Arquivos para download'));
  for(const file of files){const name=file.name.replace(/^[0-9a-f-]{36}_/,'');const b=element('button','Baixar '+name);b.onclick=async()=>{try{const r=await request('/storage/v1/object/authenticated/originais-worges/'+p.id+'/'+encodeURIComponent(file.name));const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(err){onError(err)}};const row=document.createElement('p');row.append(b);content.append(row);}
  if(!files.length)content.append(element('p','Nenhum arquivo enviado.'));
- const upload=element('label','Anexar arquivos à obra');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
+ content.append(element('p','Envie o original final em Word ou PDF em até um ano após a contratação. Você também pode anexar a capa. Depois de enviar o original final, entregue o questionário editorial em até dois dias.'));
+ const upload=element('label','Anexar original, capa ou questionário preenchido');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
  input.onchange=async()=>{input.disabled=true;try{for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');await request('/storage/v1/object/originais-worges/'+p.id+'/'+crypto.randomUUID()+'_'+clean,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}tell('Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
  content.append(element('h3','Orientações e informações da obra'));
  for(const n of notes)content.append(element('p',new Date(n.criado_em).toLocaleString('pt-BR')+' · '+n.texto));
- const form=document.createElement('form'),label=element('label','Adicionar orientação'),area=document.createElement('textarea');area.required=true;area.maxLength=16000;label.append(area);const save=element('button','Registrar orientação');form.append(label,save);content.append(form);
+ const form=document.createElement('form'),label=element('label','Adicionar orientação ou completar o questionário editorial'),area=document.createElement('textarea');area.required=true;area.maxLength=16000;label.append(area);const save=element('button','Registrar orientação');form.append(label,save);content.append(form);
  form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await request('/rest/v1/relato_projeto','POST',{projeto_id:p.id,texto:area.value.trim()});await details(p,content);tell('Orientação registrada.')}catch(err){onError(err);save.disabled=false}};
 }
 async function openDesk(){

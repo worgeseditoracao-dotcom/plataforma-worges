@@ -8,6 +8,7 @@ const inputs=[
  ['titulo','Título da obra (pode ser provisório)'],['responsavel','Nome do responsável pelo pedido'],
  ['autores','Autores, na ordem dos créditos (um por linha)','textarea'],['organizadores','Organizadores, se houver (um por linha)','textarea'],
  ['email','E-mail do responsável','email'],['confirmacao','Confirme o e-mail','email'],['telefone','WhatsApp com DDD','tel'],
+ ['envio','Quando pretende enviar a obra final?',['Vou enviar a obra agora','Vou enviar a obra depois']],['previsao','Previsão de envio (aproximada e opcional)','date'],['motivo','Motivo ou observações (opcional)','textarea'],
  ['formato','Formato do livro',['Digital','Digital e físico']],['tamanho','Tamanho do livro físico',['A definir','14 × 21 cm','16 × 23 cm','Outro (descreva nas observações)']],
  ['orelhas','Orelhas da capa física',['A definir','Com orelhas','Sem orelhas']],['cores','Cores desejadas'],['capa','Ideia de capa e referências visuais','textarea'],
  ['doi','Deseja DOI?',['Não','Sim, incluir no orçamento']],['abnt','Deseja normalização ABNT?',['Não','Sim, incluir no orçamento']],
@@ -16,7 +17,7 @@ const inputs=[
 if(pack==='Ouro')inputs.splice(inputs.findIndex(([n])=>n==='doi'),0,['kdp','Adaptação para a edição impressa na Amazon KDP',['Somente o e-book Kindle','Incluir adaptação para impresso (+ R$ 49,90)']]);
 const entregas={"Bronze": ["Diagramação digital — organização do texto e das páginas no PDF do e-book.", "Duas propostas de capa para escolha.", "ISBN digital para identificar a edição do e-book.", "Ficha catalográfica com os dados bibliográficos da obra.", "Conselho editorial."], "Prata": ["Diagramação do e-book e preparação do PDF para impressão.", "Duas propostas de capa e capa física com orelhas.", "ISBN para as edições digital e física.", "Ficha catalográfica e conselho editorial.", "QR Code e código de barras para a edição física."], "Ouro": ["Todos os itens do Prata, incluindo os arquivos para impressão.", "Revisão ortográfica e gramatical do texto.", "E-book para Amazon Kindle em EPUB refluível: o texto se adapta à tela e ao tamanho de letra escolhido pelo leitor.", "O serviço Kindle inclui a versão digital. A adaptação específica para o livro impresso na Amazon KDP é opcional e custa R$ 49,90 por obra."]};
 for(const texto of entregas[pack]||[]){const li=document.createElement('li');li.textContent=texto;document.querySelector('#itens').append(li)}
-const sections={titulo:'Obra e autoria',email:'Contato do responsável',formato:'Formato e capa',doi:'Serviços e orientações'};
+const sections={titulo:'Obra e autoria',email:'Contato do responsável',envio:'Entrega do original',formato:'Formato e capa',doi:'Serviços e orientações'};
 let group;
 for(const [name,title,type] of inputs){
  if(sections[name]){
@@ -34,6 +35,11 @@ for(const [name,title,type] of inputs){
 let draft;try{draft=JSON.parse(sessionStorage.getItem(draftKey))}catch{}
 if(draft)for(const [name] of inputs)fld[name].value=draft[name]??fld[name].value;
 const faixa=document.querySelector('#faixa');if(draft)faixa.value=draft.faixa;
+fld.motivo.placeholder='Por exemplo: estou revisando o texto ou aguardando a aprovação dos coautores.';
+const regras='Você tem até um ano após a contratação para enviar a obra final em Word, PDF ou ambos. Pode anexar sua capa ou proposta de capa. Envie o questionário editorial preenchido em até dois dias após entregar a obra final. A edição publicada pela Worges recebe novo ISBN registrado pela editora, mesmo que uma edição anterior já tenha ISBN.';
+const aviso=document.createElement('p');aviso.textContent=regras;fld.envio.closest('section').append(aviso);
+function entrega(){for(const name of ['previsao','motivo'])fld[name].parentElement.hidden=fld.envio.selectedIndex!==1;}
+entrega();fld.envio.addEventListener('change',entrega);
 const physical=()=>{for(const n of ['tamanho','orelhas'])fld[n].parentElement.hidden=fld.formato.value==='Digital'};
 physical();fld.formato.onchange=physical;
 function calcular(){
@@ -52,6 +58,7 @@ form.onsubmit=e=>{
  if(fld.email.value.trim().toLowerCase()!==fld.confirmacao.value.trim().toLowerCase()){fld.confirmacao.setCustomValidity('Os e-mails precisam ser iguais.');fld.confirmacao.reportValidity();fld.confirmacao.setCustomValidity('');return}
  if(!fld.autores.value.trim()&&!fld.organizadores.value.trim()){fld.autores.setCustomValidity('Informe ao menos um autor ou organizador.');fld.autores.reportValidity();fld.autores.setCustomValidity('');return}
  save();const resumo=['Pacote '+pack+' · até '+faixa.value+' páginas',...calcular(),...inputs.filter(([n])=>n!=='confirmacao'&&!fld[n].parentElement.hidden&&fld[n].value).map(([n,t])=>t+': '+fld[n].value)];
+ resumo.push(regras);
  if(fld.doi.selectedIndex||fld.abnt.selectedIndex)resumo.push('Adicionais sujeitos a orçamento da equipe.');
  document.querySelector('#resumo').textContent=resumo.join('\n');
  sessionStorage.setItem('worges-orcamento',JSON.stringify({referencia:draft.id,titulo:draft.titulo,responsavel:draft.responsavel,telefone:draft.telefone,modalidade:pack,ficha:resumo.join('\n'),email:draft.email.trim().toLowerCase()}));
