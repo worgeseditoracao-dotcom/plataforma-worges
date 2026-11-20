@@ -129,6 +129,160 @@ function renderMetrics(rows) {
  }));
 }
 
+function editProject(project) {
+ editing = project.id;
+ $('editor-title').textContent = 'Editar projeto: ' + project.obra;
+ const form = $('project');
+ for (const [name] of fields) {
+  const input = form.elements[name];
+  if (name === 'revisao_adicional') input.checked = project.revisao_adicional;
+  else if (name === 'valor') input.value = project.pago_centavos / 100;
+  else if (name === 'orcado') input.value = project.valor_orcado_centavos == null ? '' : project.valor_orcado_centavos / 100;
+  else input.value = project[name] ?? '';
+ }
+ $('editor').open = true;
+ form.elements.obra.focus();
+}
+
+function projectsTable(rows) {
+ const section = element('section','');
+ section.append(element('h2','Projetos editoriais'));
+ const scroll = element('div','');
+ scroll.className = 'table-scroll';
+ scroll.tabIndex = 0;
+ scroll.setAttribute('role','region');
+ scroll.setAttribute('aria-label','Lista de projetos com rolagem horizontal');
+ const table = element('table','');
+ table.className = 'projects-table';
+ table.setAttribute('aria-label','Projetos editoriais');
+ const columns = ['Obra','Autor','Tipo','Pacote','Situação comercial','Registro','Publicação prevista','Proposta','Recebido','Ações'];
+ const header = table.createTHead().insertRow();
+ for (const title of columns) {
+  const cell = element('th',title);
+  cell.scope = 'col';
+  header.append(cell);
+ }
+ const body = table.createTBody();
+ let activeDetails;
+ for (const project of rows) {
+  const row = body.insertRow();
+  const title = element('th',project.obra);
+  title.scope = 'row';
+  row.append(title);
+  row.insertCell().textContent = project.autor;
+  row.insertCell().textContent = projectType(project);
+  row.insertCell().textContent = project.pacote;
+  const status = element('span',situacaoLabel[project.situacao_comercial] || 'Dados a conferir');
+  status.className = 'project-status';
+  status.dataset.status = project.situacao_comercial || 'a_conferir';
+  row.insertCell().append(status);
+  row.insertCell().textContent = dateLabel(project.data_projeto);
+  row.insertCell().textContent = dateLabel(project.cronograma?.pausado ? null : (project.cronograma?.publicacao || project.prazo));
+  if (project.cronograma?.pausado) row.cells[6].textContent = 'Pausada';
+  row.insertCell().textContent = project.valor_orcado_centavos == null ? '—' : money(project.valor_orcado_centavos);
+  row.insertCell().textContent = project.situacao_comercial === 'pago'
+   ? (project.pago_centavos > 0 ? money(project.pago_centavos) : 'A informar')
+   : '—';
+  const buttons = element('div','');
+  buttons.className = 'row-actions';
+  const edit = element('button','Editar');
+  edit.className = 'secondary';
+  edit.setAttribute('aria-label','Editar ' + project.obra);
+  edit.onclick = () => editProject(project);
+  const toggle = element('button','Detalhes');
+  toggle.setAttribute('aria-label','Detalhes de ' + project.obra);
+  toggle.setAttribute('aria-expanded','false');
+  const detailRow = body.insertRow();
+  detailRow.id = 'detalhes-' + project.id;
+  detailRow.hidden = true;
+  const cell = detailRow.insertCell();
+  cell.colSpan = columns.length;
+  cell.className = 'project-detail';
+  toggle.setAttribute('aria-controls',detailRow.id);
+  toggle.onclick = async () => {
+   const wasOpen = !detailRow.hidden;
+   if (activeDetails) {
+    activeDetails.row.hidden = true;
+    activeDetails.button.setAttribute('aria-expanded','false');
+    activeDetails = null;
+   }
+   if (wasOpen) return;
+   activeDetails = {row:detailRow,button:toggle};
+   detailRow.hidden = false;
+   toggle.setAttribute('aria-expanded','true');
+   const contact = [project.email,project.whatsapp].filter(Boolean).join(' · ');
+   const content = element('div','');
+   cell.replaceChildren(element('h3',project.obra),element('p',project.andamento));
+   if (contact) cell.append(element('p',contact));
+   if (project.referencia_origem) cell.append(element('p','Origem: ' + project.referencia_origem));
+   if (isPublished(project)) cell.append(botaoCertificado(project));
+   content.textContent = 'Carregando etapas e arquivos…';
+   cell.append(content);
+   try { await details(project,content); }
+   catch { content.textContent = 'Não foi possível carregar as etapas e os arquivos. Feche e reabra os detalhes para tentar novamente.'; }
+  };
+  buttons.append(toggle,edit);
+  row.insertCell().append(buttons);
+ }
+ scroll.append(table);
+ section.append(scroll);
+ return section;
+}
+
+function barChart(title, data, format = String) {
+ const figure = element('figure','');
+ figure.className = 'admin-chart';
+ figure.append(element('figcaption',title));
+ const peak = Math.max(1,...data.map(([,value]) => value));
+ const list = element('ul','');
+ for (const [label,value] of data) {
+  const row = element('li','');
+  const caption = element('div','');
+  caption.className = 'chart-caption';
+  caption.append(element('span',label),element('strong',format(value)));
+  const track = element('div','');
+  track.className = 'chart-track';
+  track.setAttribute('aria-hidden','true');
+  const bar = element('div','');
+  bar.className = 'chart-bar';
+  bar.style.width = (value / peak * 100) + '%';
+  track.append(bar);
+  row.append(caption,track);
+  list.append(row);
+ }
+ figure.append(list);
+ return figure;
+}
+
+function projectCharts(rows) {
+ const section = element('section','');
+ section.append(element('h2','Gráficos dos projetos'));
+ const grid = element('div','');
+ grid.className = 'chart-grid';
+ const status = new Map(Object.keys(situacaoLabel).map(key => [key,0]));
+ const months = new Map();
+ let chapters = 0;
+ for (const project of rows) {
+  if (project.tipo_projeto === 'capitulo') chapters++;
+  const state = status.has(project.situacao_comercial) ? project.situacao_comercial : 'a_conferir';
+  status.set(state,status.get(state) + 1);
+  const month = project.data_projeto.slice(0,7);
+  const paid = state === 'pago' ? project.pago_centavos : 0;
+  months.set(month,(months.get(month) || 0) + paid);
+ }
+ const valuesByMonth = [...months.entries()].sort().map(([month,value]) => {
+  const label = new Date(month + '-02T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'numeric'});
+  return [label,value];
+ });
+ grid.append(
+  barChart('Livros e capítulos',[['Livros',rows.length - chapters],['Capítulos',chapters]]),
+  barChart('Situação comercial',[...status].map(([key,value]) => [situacaoLabel[key],value])),
+  barChart('Valor recebido por mês de registro dos projetos',valuesByMonth,money)
+ );
+ section.append(grid);
+ return section;
+}
+
 function financialReport(rows) {
  const section = element('section','');
  section.append(element('h2','Financeiro'));
@@ -213,15 +367,14 @@ function render(){
  }
  if (admin && adminView === 'cronograma') { list.append(calendario(rows)); return; }
  if (admin && adminView === 'financeiro') { list.append(financialReport(rows)); return; }
+ if (admin && adminView === 'graficos') { list.append(projectCharts(rows)); return; }
+ if (admin) { list.append(projectsTable(rows)); return; }
  for(const p of rows){
   const card=document.createElement('article');card.id='obra-'+p.id;
   const badge = element('p',projectType(p)+' · '+(situacaoLabel[p.situacao_comercial]||'Situação a conferir'));
   badge.className = 'project-status';
   badge.dataset.status = p.situacao_comercial || 'a_conferir';
   card.append(badge,element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Registro '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+(p.situacao_comercial==='pago'?(p.pago_centavos>0?' · Valor recebido identificado '+money(p.pago_centavos):' · Valor pago não informado'):p.valor_orcado_centavos!=null?' · Proposta '+money(p.valor_orcado_centavos):' · Valor não confirmado')),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
-  if(admin&&p.referencia_origem)card.append(element('small','Origem: '+p.referencia_origem));
-  if(admin&&isPublished(p))card.append(botaoCertificado(p));
-  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;$('editor-title').textContent='Editar projeto: '+p.obra;for(const [name] of fields)if(name==='revisao_adicional')$('project').elements[name].checked=p.revisao_adicional;else $('project').elements[name].value=name==='valor'?p.pago_centavos/100:name==='orcado'?(p.valor_orcado_centavos==null?'':p.valor_orcado_centavos/100):p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
   const box=document.createElement('details');box.append(element('summary','Etapas, arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
  }
 }
