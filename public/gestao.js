@@ -82,6 +82,10 @@ async function details(p,content){
  for(const file of files){const name=file.name.replace(/^[0-9a-f-]{36}_/,'');const b=element('button','Baixar '+name);b.onclick=async()=>{try{const r=await request('/storage/v1/object/authenticated/originais-worges/'+p.id+'/'+encodeURIComponent(file.name));const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}catch(err){onError(err)}};const row=document.createElement('p');row.append(b);content.append(row);}
  if(!files.length)content.append(element('p','Nenhum arquivo enviado.'));
  content.append(element('p','Envie o original final em Word ou PDF em até um ano após a contratação. Você também pode anexar a capa. Depois de enviar o original final, entregue o questionário editorial em até dois dias.'));
+ if((p.checkout_id||p.pago_centavos>0)&&!admin){
+ const pack=p.pacote.split(' ')[0];
+ if(['Bronze','Prata','Ouro'].includes(pack)){const ficha=element('a','Preencher ficha editorial desta obra');ficha.href='/ficha.html?pacote='+encodeURIComponent(pack)+'&projeto='+encodeURIComponent(p.id);content.append(ficha)}
+ }
  const upload=element('label','Anexar original, capa ou questionário preenchido');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
  input.onchange=async()=>{input.disabled=true;try{for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');await request('/storage/v1/object/originais-worges/'+p.id+'/'+crypto.randomUUID()+'_'+clean,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}tell('Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
  content.append(element('h3','Orientações e informações da obra'));
@@ -91,6 +95,7 @@ async function details(p,content){
 }
 async function openDesk(){
  const user=await(await request('/auth/v1/user')).json();
+ const comprar=new URLSearchParams(location.search).get('comprar');if(!admin&&['Bronze','Prata','Ouro'].includes(comprar)){location.replace('/pedido.html?pacote='+comprar);return}
  $('auth').hidden=true;$('desk').hidden=false;
  if(admin&&user.app_metadata?.worges_role!=='admin'){tell('Seu acesso administrativo precisa ser habilitado pela Worges.');$('search').parentElement.hidden=true;return}
  $('manager').hidden=!admin;reset();tell('');await loadProjects();

@@ -2,7 +2,8 @@ const form=document.querySelector('#briefing');
 const fld=form.elements;
 const pack=new URLSearchParams(location.search).get('pacote');
 const rates={Bronze:30900,Prata:33990,Ouro:49990};
-const draftKey='worges-questionario-'+pack;
+const projeto=new URLSearchParams(location.search).get('projeto');
+const draftKey='worges-ficha-'+projeto;
 const brl=n=>(n/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const inputs=[
  ['titulo','Título da obra (pode ser provisório)'],['responsavel','Nome do responsável pelo pedido'],
@@ -14,7 +15,6 @@ const inputs=[
  ['doi','Deseja DOI?',['Não','Sim, incluir no orçamento']],['abnt','Deseja normalização ABNT?',['Não','Sim, incluir no orçamento']],
  ['repasse','Orientações ou dúvidas sobre repasse (opcional)','textarea'],['extras','Informações adicionais','textarea']
 ];
-if(pack==='Ouro')inputs.splice(inputs.findIndex(([n])=>n==='doi'),0,['kdp','Adaptação para a edição impressa na Amazon KDP',['Somente o e-book Kindle','Incluir adaptação para impresso (+ R$ 49,90)']]);
 const entregas={"Bronze": ["Diagramação digital — organização do texto e das páginas no PDF do e-book.", "Duas propostas de capa para escolha.", "ISBN digital para identificar a edição do e-book.", "Ficha catalográfica com os dados bibliográficos da obra.", "Conselho editorial."], "Prata": ["Diagramação do e-book e preparação do PDF para impressão.", "Duas propostas de capa e capa física com orelhas.", "ISBN para as edições digital e física.", "Ficha catalográfica e conselho editorial.", "QR Code e código de barras para a edição física."], "Ouro": ["Todos os itens do Prata, incluindo os arquivos para impressão.", "Revisão ortográfica e gramatical do texto.", "E-book para Amazon Kindle em EPUB refluível: o texto se adapta à tela e ao tamanho de letra escolhido pelo leitor.", "O serviço Kindle inclui a versão digital. A adaptação específica para o livro impresso na Amazon KDP é opcional e custa R$ 49,90 por obra."]};
 for(const texto of entregas[pack]||[]){const li=document.createElement('li');li.textContent=texto;document.querySelector('#itens').append(li)}
 const sections={titulo:'Obra e autoria',email:'Contato do responsável',envio:'Entrega do original',formato:'Formato e capa',doi:'Serviços e orientações'};
@@ -57,10 +57,20 @@ form.onsubmit=e=>{
  e.preventDefault();if(!Object.hasOwn(rates,pack))return;
  if(fld.email.value.trim().toLowerCase()!==fld.confirmacao.value.trim().toLowerCase()){fld.confirmacao.setCustomValidity('Os e-mails precisam ser iguais.');fld.confirmacao.reportValidity();fld.confirmacao.setCustomValidity('');return}
  if(!fld.autores.value.trim()&&!fld.organizadores.value.trim()){fld.autores.setCustomValidity('Informe ao menos um autor ou organizador.');fld.autores.reportValidity();fld.autores.setCustomValidity('');return}
- save();const resumo=['Pacote '+pack+' · até '+faixa.value+' páginas',...calcular(),...inputs.filter(([n])=>n!=='confirmacao'&&!fld[n].parentElement.hidden&&fld[n].value).map(([n,t])=>t+': '+fld[n].value)];
+ save();const resumo=['Ficha editorial · Pacote '+pack,...inputs.filter(([n])=>n!=='confirmacao'&&!fld[n].parentElement.hidden&&fld[n].value).map(([n,t])=>t+': '+fld[n].value)];
  resumo.push(regras);
  if(fld.doi.selectedIndex||fld.abnt.selectedIndex)resumo.push('Adicionais sujeitos a orçamento da equipe.');
  document.querySelector('#resumo').textContent=resumo.join('\n');
- sessionStorage.setItem('worges-orcamento',JSON.stringify({referencia:draft.id,titulo:draft.titulo,responsavel:draft.responsavel,telefone:draft.telefone,modalidade:pack,ficha:resumo.join('\n'),email:draft.email.trim().toLowerCase()}));
+ 
  document.querySelector('#revisao').hidden=false;document.querySelector('#revisao').scrollIntoView();
+};
+
+document.querySelector('#enviarFicha').onclick=async e=>{
+ const session=JSON.parse(sessionStorage.getItem('worges-login')||'null');
+ if(!session){location.assign('/cliente');return}
+ const b=e.currentTarget;b.disabled=true;
+ try{
+ const r=await fetch('https://rraitizanntzdurqdqkm.supabase.co/rest/v1/relato_projeto',{method:'POST',headers:{apikey:'sb_publishable_VvOy5B3haLBPS7sIyfZ9gg_bHiBRbiy',Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({projeto_id:projeto,texto:document.querySelector('#resumo').textContent})});
+ if(!r.ok)throw Error();sessionStorage.removeItem(draftKey);location.assign('/cliente');
+ }catch{b.disabled=false;document.querySelector('#fichaStatus').textContent='Confira sua sessão na área do autor e tente novamente.'}
 };
