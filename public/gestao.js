@@ -14,15 +14,20 @@ async function request(path,method='GET',body,raw=false,extra={}){
  if(session?.access_token)headers.Authorization='Bearer '+session.access_token;
  if(body && !raw)headers['Content-Type']='application/json';
  const r=await fetch(host+path,{method,headers,body:raw?body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ if(!r.ok && path.startsWith('/auth/')){
+  const detail=await r.json().catch(()=>({}));
+  const reasons={email_not_confirmed:'Confirme o e-mail antes de entrar. Você pode reenviar o link abaixo.',invalid_credentials:'Confira o e-mail e a senha.',weak_password:'Escolha uma senha mais forte, com pelo menos 8 caracteres.',signup_disabled:'O cadastro está temporariamente indisponível.'};
+  throw Error(reasons[detail.error_code]||(r.status===429?'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.':'Não foi possível concluir o acesso. Confira os dados e tente novamente.'));
+ }
  if(!r.ok)throw Error(r.status===401?'Entre novamente para continuar.':r.status===403?'Sua conta não tem permissão para esta ação.':'Não foi possível concluir. Confira os dados e tente novamente.');
  return r;
 }
 async function login(signup){
  const f=$('login');if(!f.reportValidity())return;
  const payload=Object.fromEntries(new FormData(f));
- const r=await request(signup?'/auth/v1/signup':'/auth/v1/token?grant_type=password','POST',payload);
- const result=await r.json();f.reset();
- if(!result.access_token){tell('Confira seu e-mail para confirmar a conta e depois entre com sua senha.');return}
+ const r=await request(signup?'/auth/v1/signup?redirect_to='+encodeURIComponent(location.origin+'/gestao.html'):'/auth/v1/token?grant_type=password','POST',payload);
+ const result=await r.json();f.elements.password.value="";
+ if(!result.access_token){tell('Verifique a caixa de entrada e o spam de '+payload.email+'. Abra o link de confirmação e depois entre com sua senha.');return}
  remember(result);await openDesk();
 }
 $('heading').textContent=admin?'Administração editorial':'Meus projetos';
@@ -151,7 +156,14 @@ async function recoveryForm(token){
 }
 async function startDesk(){
  offerRecovery();
+ const resend=element('button','Reenviar e-mail de confirmação');resend.type='button';$('login').append(resend);
+ resend.onclick=async()=>{
+  const email=$('login').elements.email;if(!email.reportValidity())return;
+  resend.disabled=true;
+  try{await request('/auth/v1/resend?redirect_to='+encodeURIComponent(location.origin+'/gestao.html'),'POST',{type:'signup',email:email.value.trim()});tell('Se houver confirmação pendente, confira a caixa de entrada e o spam.')}catch(err){onError(err)}finally{resend.disabled=false}
+ };
  const fragment=new URLSearchParams(location.hash.slice(1));
+ if(fragment.get('type')==='signup'&&!fragment.has('error')){history.replaceState(null,'',location.pathname+location.search);tell('E-mail confirmado. Entre com seu e-mail e senha.');}
  if(fragment.has('error')||fragment.get('type')==='recovery'){
   history.replaceState(null,'',location.pathname+location.search);
   session=null;sessionStorage.removeItem('worges-login');
