@@ -28,3 +28,11 @@ body[data-kind] .tag{color:#79225d;background:#f9e2ef}
 .checkout-page{background:linear-gradient(125deg,#fceaf3,#f3f2ff 55%,#fff8de)}.checkout-page .checkout-shell>div:first-child{border-top:5px solid #94285d;padding-top:24px}
 @media(hover:hover) and (prefers-reduced-motion:no-preference){.atelier button,.checkout-page .button.primary,.publication-page .button.primary{transition:transform .2s,box-shadow .2s}.atelier button:hover,.checkout-page .button.primary:hover,.publication-page .button.primary:hover{transform:translateY(-2px);box-shadow:0 5px 18px #a43b7840}}
 @media(max-width:700px){.selo-worges{width:48px;height:53px}.atelier main{margin-top:20px}.atelier main>h1{padding:32px 20px}.atelier .grid>*{min-width:0}body[data-kind] .nav{gap:10px}body[data-kind] .nav nav{gap:12px}.atelier #desk{overflow-wrap:anywhere}}
+.pedido #perguntas section,.pedido .entregas{padding:clamp(18px,4vw,34px);margin:22px 0}
+.pedido #perguntas h3,.pedido .entregas h2{color:#702955;margin:0 0 18px;font:600 25px/1.2 Georgia,serif}
+.pedido #perguntas label{display:grid;gap:6px;margin:15px 0 0}
+.pedido #perguntas :is(input,textarea,select){width:100%;margin:0}
+.pedido #perguntas [hidden]{display:none!important}
+.pedido .entregas>b{display:inline-block;background:#ffeb91;color:#452641;border-radius:20px;padding:5px 14px;margin-bottom:15px}
+.pedido .entregas ul{padding-left:21px}.pedido .entregas li{margin:8px 0}.pedido .entregas li::marker{color:#9b2867}
+.pedido .memoria-preco{white-space:pre-line;background:linear-gradient(112deg,#401b45,#54326b,#194c72);color:white;border-radius:14px;padding:18px 24px;line-height:1.8;font-variant-numeric:tabular-nums}
