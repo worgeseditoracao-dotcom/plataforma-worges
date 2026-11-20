@@ -35,10 +35,10 @@ $('heading').textContent=admin?'Administração editorial':'Meus projetos';
 $('login').onsubmit=e=>{e.preventDefault();login(false).catch(onError)};
 $('signup').onclick=()=>login(true).catch(onError);
 $('logout').onclick=async()=>{try{await request('/auth/v1/logout','POST')}finally{sessionStorage.removeItem('worges-login');location.reload()}};
-const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['prazo','Prazo previsto','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
+const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
 for(const [name,title,type] of fields){
  const label=element('label',title),input=document.createElement('input');input.name=name;input.type=type;
- input.required=!['prazo','whatsapp'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
+ input.required=!['prazo','whatsapp','original_final_em','revisao_adicional'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
  label.append(input);$('fields').append(label);
 }
 function reset(){editing=null;HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
@@ -46,7 +46,7 @@ $('reset').onclick=reset;
 $('project').onsubmit=async e=>{
  e.preventDefault();const f=e.target,data=Object.fromEntries(new FormData(f));
  data.email=data.email.trim().toLowerCase();data.pago_centavos=Math.round(Number(data.valor)*100);delete data.valor;
- if(!data.prazo)data.prazo=null;
+ if(!data.prazo)data.prazo=null;if(!data.original_final_em)data.original_final_em=null;data.revisao_adicional=f.elements.revisao_adicional.checked;
  try{await request('/rest/v1/projetos_painel'+(editing?'?id=eq.'+editing:''),editing?'PATCH':'POST',data);reset();$('editor').open=false;await loadProjects();tell('Projeto salvo.')}catch(err){onError(err)}
 };
 async function allRows(path){
@@ -62,16 +62,27 @@ function botaoCertificado(p){
  }catch(e){onError(e)}finally{b.disabled=false}};return b;
 }
 window.addEventListener('hashchange',()=>{if(session&&!admin)render()});
+function calendario(rows){
+ const section=element('section','');section.append(element('h2',admin?'Cronograma editorial da equipe':'Meu cronograma editorial'));
+ const eventos=[];
+ for(const p of rows){const c=p.cronograma;if(!c)continue;
+ for(const [campo,nome] of [['revisao','Entrega do texto revisado'],['diagramacao','Entrega do livro diagramado'],['publicacao','Publicação prevista']])if(c[campo])eventos.push({data:c[campo],obra:p.obra,nome,provisorio:c.provisorio});
+ }
+ if(!eventos.length)section.append(element('p','As previsões aparecem após o registro do pagamento.'));
+ else{const ol=element('ol','');for(const e of eventos.sort((a,b)=>a.data.localeCompare(b.data))){const li=element('li','');li.append(element('strong',e.data.split('-').reverse().join('/')+' · '+e.nome),element('p',e.obra+(e.provisorio?' · Previsão inicial, aguardando original final.':'')));ol.append(li)}section.append(ol)}
+ return section;
+}
 function render(){
  const list=$('list');list.replaceChildren();
  if(!admin){
-  const view=['livros','certificados','pacotes'].includes(location.hash.slice(1))?location.hash.slice(1):'pacotes';
+  const view=['livros','certificados','pacotes','cronograma'].includes(location.hash.slice(1))?location.hash.slice(1):'pacotes';
   const style=document.createElement('style');style.textContent='.portal-nav,.portal-ofertas{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}.portal-nav a,.portal-ofertas a{padding:14px 18px;border-radius:12px;text-decoration:none;font-weight:700}.portal-nav a{background:white;color:#4a205c;border:1px solid #d5bddb}.portal-nav a[aria-current=page]{background:#52245e;color:white}.portal-ofertas a{flex:1 1 150px;display:grid;gap:10px;color:white!important;background:linear-gradient(125deg,#80432a,#64324d);box-shadow:0 9px 22px #36133420}.portal-ofertas a:nth-child(2){background:linear-gradient(125deg,#374a74,#21637b)}.portal-ofertas a:nth-child(3){background:linear-gradient(125deg,#75450a,#805325)}.portal-ofertas strong{font:600 26px Georgia}.portal-ofertas span{font-size:14px}';list.append(style);
   const nav=document.createElement('nav');nav.className='portal-nav';nav.setAttribute('aria-label','Área do autor');
-  for(const [key,label] of [['pacotes','Meus pacotes'],['livros','Meus livros e projetos'],['certificados','Meus certificados']]){
+  for(const [key,label] of [['pacotes','Meus pacotes'],['livros','Meus livros e projetos'],['certificados','Meus certificados'],['cronograma','Meu cronograma']]){
    const a=element('a',label);a.href='#'+key;if(key===view)a.setAttribute('aria-current','page');nav.append(a);
   }
   list.append(nav);$('search').parentElement.hidden=view!=='livros'||!projects.length;
+  if(view==='cronograma'){list.append(calendario(projects));return}
   if(view==='pacotes'){
    const section=element('section','');section.append(element('h2','Meus pacotes'));
    const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
@@ -85,7 +96,7 @@ function render(){
    const coletaneas=element('section','');
    coletaneas.append(element('h2','Coletâneas'),element('h3','Publicar um capítulo de livro'),element('p','Nesta modalidade, seu capítulo integra um livro com trabalhos de outros autores. As condições para envio dos capítulos serão divulgadas aqui.'));
    const acervo=element('a','Conhecer as coletâneas publicadas →');acervo.href='/capitulos.html';coletaneas.append(acervo);
-   list.append(section,coletaneas);return;
+   list.append(section,coletaneas);if(purchases.length)list.append(calendario(purchases));return;
   }
   if(view==='certificados'){
    const section=element('section','');section.append(element('h2','Certificados de publicação'),element('p','Primeira emissão gratuita por obra. Reemissão: R$ 29,90.'));
@@ -100,10 +111,11 @@ function render(){
  const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
  $('report').textContent=rows.length+' projeto(s) · Total pago '+money(rows.reduce((s,p)=>s+p.pago_centavos,0));
  if(!rows.length)list.append(element('p',projects.length?'Nenhuma obra corresponde à busca.':'Você ainda não tem obras cadastradas. Aqui poderá acompanhar as etapas de cada livro e acessar seus arquivos.'));
+ if(admin)list.append(calendario(rows));
  for(const p of rows){
   const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
   if(admin&&/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()))card.append(botaoCertificado(p));
-  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)$('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
+  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)if(name==='revisao_adicional')$('project').elements[name].checked=p.revisao_adicional;else $('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
   const box=document.createElement('details');box.append(element('summary','Etapas, arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
  }
 }
@@ -123,8 +135,9 @@ async function details(p,content){
  const pack=p.pacote.split(' ')[0];
  if(['Bronze','Prata','Ouro'].includes(pack)){const ficha=element('a','Preencher ficha editorial desta obra');ficha.href='/ficha.html?pacote='+encodeURIComponent(pack)+'&projeto='+encodeURIComponent(p.id);content.append(ficha)}
  }
+ const final=document.createElement('input');final.type='checkbox';const finalLabel=element('label','Este envio contém o original final em Word ou PDF');finalLabel.prepend(final);if(!p.original_final_em)content.append(finalLabel);
  const upload=element('label','Anexar original, capa ou questionário preenchido');const input=document.createElement('input');input.type='file';input.multiple=true;upload.append(input);content.append(upload);
- input.onchange=async()=>{input.disabled=true;try{for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');await request('/storage/v1/object/originais-worges/'+p.id+'/'+crypto.randomUUID()+'_'+clean,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}tell('Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
+ input.onchange=async()=>{input.disabled=true;try{let original;if(final.checked&&![...input.files].some(f=>/\.(docx?|pdf)$/i.test(f.name)))throw Error('Selecione um original em Word ou PDF.');for(const file of input.files){const clean=file.name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');const path=p.id+'/'+crypto.randomUUID()+'_'+clean;if(final.checked&&/\.(docx?|pdf)$/i.test(clean))original=path;await request('/storage/v1/object/originais-worges/'+path,'POST',file,true,{'Content-Type':file.type||'application/octet-stream'});}if(original){await request('/rest/v1/rpc/confirmar_original_final','POST',{projeto:p.id,arquivo:original});await loadProjects()}tell(original?'Original recebido. Cronograma atualizado.':'Arquivos enviados.')}catch(err){onError(err)}finally{input.disabled=false;details(p,content).catch(onError)}};
  content.append(element('h3','Orientações e informações da obra'));
  for(const n of notes)content.append(element('p',new Date(n.criado_em).toLocaleString('pt-BR')+' · '+n.texto));
  const form=document.createElement('form'),label=element('label','Adicionar orientação ou completar o questionário editorial'),area=document.createElement('textarea');area.required=true;area.maxLength=16000;label.append(area);const save=element('button','Registrar orientação');form.append(label,save);content.append(form);
