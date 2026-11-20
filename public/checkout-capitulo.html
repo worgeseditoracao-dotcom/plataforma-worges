@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publicar capítulo | Worges Editoração</title>
+<style>
+:root{font:16px system-ui;color:#221c31;background:#f8f3fa}*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:auto;padding:24px}a{color:#6c235b}header{padding:clamp(24px,5vw,60px);background:linear-gradient(115deg,#57204e,#124b70);color:white;border-radius:24px;margin:18px 0 24px}h1,h2{font-family:Georgia,serif}h1{font-size:clamp(2rem,5vw,3.5rem);margin:0}h2{margin-top:0}header p{margin:.7rem 0 0}.columns{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:start}form,aside{background:white;border:1px solid #dfd3e6;padding:clamp(16px,3vw,28px);border-radius:20px}label{display:block;margin:1rem 0;font-weight:600}input:not([type=checkbox]),select{display:block;width:100%;margin-top:.4rem;padding:.8rem;border:1px solid #a89ab1;border-radius:8px;background:white;color:inherit;font:inherit}fieldset{border:1px solid #dfd3e6;border-radius:12px;margin:1rem 0}fieldset label{font-weight:500}p,li{line-height:1.55}li{margin:.45rem 0}.total{background:#f4e8f3;padding:1rem;border-radius:10px;display:flex;justify-content:space-between;gap:1rem}button{padding:.9rem 1.3rem;background:#682358;color:white;border:0;border-radius:8px;font:inherit;font-weight:bold;cursor:pointer}button:disabled{opacity:.6;cursor:wait}#status{color:#702751}small{font-weight:400;display:block;margin-top:.4rem}@media(max-width:720px){.columns{grid-template-columns:1fr}main{padding:14px}}
+</style>
+<script src="/checkout-capitulo.js" defer></script>
+</head>
+<body><main>
+<a href="/worges-inicio.html#coletaneas-abertas">← Voltar às coletâneas</a>
+<header><h1>Publique seu capítulo</h1><p>Escolha uma coletânea, envie o arquivo e confira o total antes de pagar.</p></header>
+<div class="columns">
+<form id="submission">
+<h2>Dados do capítulo</h2>
+<p id="account"><a href="/gestao.html">Entrar ou criar acesso na Área do Autor ↗</a></p>
+<label>Coletânea<select name="coletanea" required><option value="">Selecione uma área</option><option value="Educação">Perspectivas em Pesquisa: Educação</option>
+<option value="Ciências Exatas e Engenharias">Perspectivas em Pesquisa: Ciências Exatas e Engenharias</option>
+<option value="Linguística, Letras e Artes">Perspectivas em Pesquisa: Linguística, Letras e Artes</option>
+<option value="Saúde e Ciências Biológicas">Perspectivas em Pesquisa: Saúde e Ciências Biológicas</option>
+<option value="Ciências Sociais Aplicadas e Humanas">Perspectivas em Pesquisa: Ciências Sociais Aplicadas e Humanas</option>
+<option value="Ciências Agrárias">Perspectivas em Pesquisa: Ciências Agrárias</option></select></label>
+<label>Título do capítulo<input name="titulo" maxlength="240" required></label>
+<label>Número de páginas<input name="paginas" type="number" min="1" max="30" step="1" required><small>O checkout aceita até 30 páginas. Para capítulos maiores, <a href="mailto:worgeseditoracao@gmail.com">fale com a editora</a>.</small></label>
+<label>Arquivo em Word ou PDF<input name="arquivo" type="file" accept=".pdf,.doc,.docx" required><small>Limite de 10 MB por arquivo.</small></label>
+<label><input type="checkbox" name="a4" required> Confirmo que o arquivo está em formato A4.</label>
+<p><a href="/template-capitulo-worges.docx" download>Baixar modelo em Word ↓</a><br>O modelo serve como orientação. Você pode adaptar a estrutura ao seu capítulo.</p>
+<label>Modalidade de publicação<select name="modalidade"><option value="regular">Regular · 10 dias · R$ 179,90</option><option value="urgente">Urgente · 2 dias · R$ 197,90</option></select></label>
+<fieldset><legend>Serviços opcionais</legend>
+<label><input type="checkbox" name="abnt"> Normalização ABNT · R$ 39,90 por capítulo</label>
+<label><input type="checkbox" name="revisao"> Correção ortográfica · R$ 39,90 por capítulo</label>
+</fieldset>
+<p class="total"><span>Total do capítulo</span><strong id="total">R$ 179,90</strong></p>
+<button type="submit">Continuar para a InfinitePay</button>
+<p id="status" role="status"></p>
+</form>
+<aside><h2>O que a coletânea inclui</h2><ul>
+<li>Ficha catalográfica (CIP)</li><li>ISBN digital (CBL)</li><li>DOI do livro (Crossref)</li><li>DOI individual de cada capítulo (Crossref)</li><li>Licença Creative Commons</li><li>Carta de aceite</li><li>Certificado de publicação</li><li>Indexação no Google Books</li><li>Conselho editorial</li>
+</ul></aside>
+</div></main></body></html>
