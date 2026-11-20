@@ -35,17 +35,20 @@ $('heading').textContent=admin?'Administração editorial':'Meus projetos';
 $('login').onsubmit=e=>{e.preventDefault();login(false).catch(onError)};
 $('signup').onclick=()=>login(true).catch(onError);
 $('logout').onclick=async()=>{try{await request('/auth/v1/logout','POST')}finally{sessionStorage.removeItem('worges-login');location.reload()}};
-const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['revisao_enviada_em','Revisão enviada ao autor (inicia a pausa)','date'],['revisao_devolvida_em','Resposta do autor recebida (retoma o prazo)','date'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
+const fields=[['obra','Título da obra ou capítulo','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['tipo_projeto','Tipo de publicação','select'],['situacao_comercial','Situação comercial','select'],['pacote','Pacote ou modalidade','text'],['data_projeto','Data do projeto ou atividade documentada','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['revisao_enviada_em','Revisão enviada ao autor (inicia a pausa)','date'],['revisao_devolvida_em','Resposta do autor recebida (retoma o prazo)','date'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago confirmado (R$)','number'],['orcado','Valor da proposta (R$)','number'],['referencia_origem','Referência da informação (e-mail ou registro)','text']];
 for(const [name,title,type] of fields){
- const label=element('label',title),input=document.createElement('input');input.name=name;input.type=type;
- input.required=!['revisao_enviada_em','revisao_devolvida_em','prazo','whatsapp','original_final_em','revisao_adicional'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
+ const label=element('label',title),input=document.createElement(type==='select'?'select':'input');input.name=name;if(type!=='select')input.type=type;
+ if(name==='tipo_projeto')for(const [value,text] of [['livro','Livro'],['capitulo','Capítulo de livro']])input.add(new Option(text,value));
+ if(name==='situacao_comercial')for(const [value,text] of [['pago','Pagamento confirmado'],['proposta','Proposta sem pagamento confirmado'],['em_andamento_anterior','Projeto anterior em andamento'],['a_conferir','Dados a conferir']])input.add(new Option(text,value));
+ input.required=!['revisao_enviada_em','revisao_devolvida_em','prazo','whatsapp','original_final_em','revisao_adicional','orcado','referencia_origem'].includes(name);if(['valor','orcado'].includes(name)){input.min='0';input.step='0.01'}
  label.append(input);$('fields').append(label);
 }
-function reset(){editing=null;HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
+function reset(){editing=null;HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.orcado.value='';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
 $('reset').onclick=reset;
 $('project').onsubmit=async e=>{
  e.preventDefault();const f=e.target,data=Object.fromEntries(new FormData(f));
  data.email=data.email.trim().toLowerCase();data.pago_centavos=Math.round(Number(data.valor)*100);delete data.valor;
+ data.valor_orcado_centavos=data.orcado===''?null:Math.round(Number(data.orcado)*100);delete data.orcado;
  for(const key of ['revisao_enviada_em','revisao_devolvida_em'])data[key]=data[key]||null;
  if(!data.prazo)data.prazo=null;if(!data.original_final_em)data.original_final_em=null;data.revisao_adicional=f.elements.revisao_adicional.checked;
  try{await request('/rest/v1/projetos_painel'+(editing?'?id=eq.'+editing:''),editing?'PATCH':'POST',data);reset();$('editor').open=false;await loadProjects();tell('Projeto salvo.')}catch(err){onError(err)}
@@ -74,6 +77,8 @@ function calendario(rows){
  else{const ol=element('ol','');for(const e of eventos.sort((a,b)=>a.data.localeCompare(b.data))){const li=element('li','');li.append(element('strong',e.data.split('-').reverse().join('/')+' · '+e.nome),element('p',e.obra+(e.provisorio?' · Previsão inicial, aguardando original final.':'')));ol.append(li)}section.append(ol)}
  return section;
 }
+let periodoSelecionado='todos', tipoSelecionado='todos';
+const situacaoLabel={pago:'Pagamento confirmado',proposta:'Proposta · pagamento não confirmado',em_andamento_anterior:'Projeto anterior · ativo no mês',a_conferir:'Dados a conferir'};
 function render(){
  const list=$('list');list.replaceChildren();
  if(!admin){
@@ -87,7 +92,7 @@ function render(){
   if(view==='cronograma'){list.append(calendario(projects));return}
   if(view==='pacotes'){
    const section=element('section','');section.append(element('h2','Meus pacotes'));
-   const purchases=projects.filter(p=>p.checkout_id||p.pago_centavos>0);
+   const purchases=projects.filter(p=>p.checkout_id||(p.situacao_comercial==='pago'&&p.pago_centavos>0));
    if(!purchases.length)section.append(element('p','Escolha o pacote para a sua próxima obra.'));
    for(const p of purchases){section.append(element('p',p.pacote+' · '+p.obra+' · Pago '+money(p.pago_centavos)))}
    const offers=element('div','');offers.className='portal-ofertas';
@@ -109,15 +114,23 @@ function render(){
   }
   list.append(element('h2','Meus livros e projetos'));
  }
+ if(admin){const filtros=element('div','');filtros.className='grid';
+  const periodo=element('label','Mês do registro');const meses=element('select','');meses.add(new Option('Todos os meses','todos'));
+  for(const mes of [...new Set(projects.map(p=>p.data_projeto.slice(0,7)))].sort().reverse())meses.add(new Option(new Date(mes+'-02T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}),mes));
+  meses.value=periodoSelecionado;if(meses.selectedIndex<0){meses.value='todos';periodoSelecionado='todos'}meses.onchange=()=>{periodoSelecionado=meses.value;render()};periodo.append(meses);
+  const tipo=element('label','Tipo de publicação'),tipos=element('select','');for(const [v,n] of [['todos','Livros e capítulos'],['livro','Livros'],['capitulo','Capítulos de livro']])tipos.add(new Option(n,v));tipos.value=tipoSelecionado;tipos.onchange=()=>{tipoSelecionado=tipos.value;render()};tipo.append(tipos);filtros.append(periodo,tipo);list.append(filtros);
+ }
  const term=$('search').value.trim().toLocaleLowerCase();
- const rows=projects.filter(p=>[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento].join(' ').toLocaleLowerCase().includes(term));
- $('report').textContent=rows.length+' projeto(s) · Total pago '+money(rows.reduce((s,p)=>s+p.pago_centavos,0));
+ const rows=projects.filter(p=>(!admin||periodoSelecionado==='todos'||p.data_projeto.startsWith(periodoSelecionado))&&(!admin||tipoSelecionado==='todos'||(p.tipo_projeto||'livro')===tipoSelecionado)&&[p.obra,p.autor,p.email,p.whatsapp,p.pacote,p.andamento,p.referencia_origem].join(' ').toLocaleLowerCase().includes(term));
+ const pagos=rows.filter(p=>p.situacao_comercial==='pago');
+ $('report').textContent=rows.length+' registro(s) · '+rows.filter(p=>(p.tipo_projeto||'livro')==='livro').length+' livro(s) · '+rows.filter(p=>p.tipo_projeto==='capitulo').length+' capítulo(s) · '+pagos.length+' pagamento(s) confirmado(s) · Total recebido identificado '+money(pagos.reduce((s,p)=>s+p.pago_centavos,0));
  if(!rows.length)list.append(element('p',projects.length?'Nenhuma obra corresponde à busca.':'Você ainda não tem obras cadastradas. Aqui poderá acompanhar as etapas de cada livro e acessar seus arquivos.'));
  if(admin)list.append(calendario(rows));
  for(const p of rows){
-  const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Início '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+' · Pago '+money(p.pago_centavos)),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
+  const card=document.createElement('article');card.id='obra-'+p.id;card.append(element('p',(p.tipo_projeto==='capitulo'?'Capítulo de livro':'Livro')+' · '+(situacaoLabel[p.situacao_comercial]||'Situação a conferir')),element('h2',p.obra),element('p',p.autor+' · '+p.pacote+' · '+p.andamento),element('p','Registro '+p.data_projeto.split('-').reverse().join('/')+(p.prazo?' · Prazo '+p.prazo.split('-').reverse().join('/'):'')+(p.situacao_comercial==='pago'?(p.pago_centavos>0?' · Valor recebido identificado '+money(p.pago_centavos):' · Valor pago não informado'):p.valor_orcado_centavos!=null?' · Proposta '+money(p.valor_orcado_centavos):' · Valor não confirmado')),element('p',[p.email,p.whatsapp].filter(Boolean).join(' · ')));
+  if(admin&&p.referencia_origem)card.append(element('small','Origem: '+p.referencia_origem));
   if(admin&&/^(publicad[oa]|obra publicada|livro publicado)$/i.test(p.andamento.trim()))card.append(botaoCertificado(p));
-  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)if(name==='revisao_adicional')$('project').elements[name].checked=p.revisao_adicional;else $('project').elements[name].value=name==='valor'?p.pago_centavos/100:p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
+  if(admin){const edit=element('button','Editar projeto');edit.onclick=()=>{editing=p.id;for(const [name] of fields)if(name==='revisao_adicional')$('project').elements[name].checked=p.revisao_adicional;else $('project').elements[name].value=name==='valor'?p.pago_centavos/100:name==='orcado'?(p.valor_orcado_centavos==null?'':p.valor_orcado_centavos/100):p[name]||'';$('editor').open=true;$('editor').scrollIntoView()};card.append(edit)}
   const box=document.createElement('details');box.append(element('summary','Etapas, arquivos e orientações da obra'));const content=document.createElement('div');box.append(content);box.ontoggle=()=>{if(box.open)details(p,content).catch(onError)};card.append(box);list.append(card);
  }
 }
