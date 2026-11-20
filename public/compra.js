@@ -16,6 +16,7 @@ if(Object.hasOwn(rates,pack)){
   ['copidesque','Copidesque',18990,'Preparação de texto com ajustes de clareza, fluidez e coerência. Valor único por obra.']
  ];
  for(const [id,nome,valor,descricao] of extras){
+  if(valor===0)continue;
   const label=document.createElement('label'),box=document.createElement('input');
   box.type='checkbox';box.id=id;box.style.width='auto';box.style.marginRight='8px';
   box.checked=valor===0||Boolean(saved[id]);box.disabled=valor===0;
@@ -32,7 +33,7 @@ if(Object.hasOwn(rates,pack)){
   const selecao={faixa:el('faixa').value,kdp:formato[0]};
   const linhas=['Pacote com 40% de desconto: '+dinheiro(rates[pack]),'Acréscimo por páginas: '+dinheiro(paginas)];
   let total=rates[pack]+paginas+formato[2];
-  for(const [id,nome,valor] of extras){selecao[id]=el(id).checked;if(selecao[id]&&valor){linhas.push(nome+': '+dinheiro(valor));total+=valor}}
+  for(const [id,nome,valor] of extras){if(!valor)continue;selecao[id]=el(id).checked;if(selecao[id]&&valor){linhas.push(nome+': '+dinheiro(valor));total+=valor}}
   if(formato[2])linhas.push(formato[1]+': '+dinheiro(formato[2]));
   el('memoria').textContent=[...linhas,'Total: '+dinheiro(total)].join('\n');
   sessionStorage.setItem(key,JSON.stringify(selecao));
