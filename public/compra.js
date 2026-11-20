@@ -10,8 +10,26 @@ if(Object.hasOwn(rates,pack)){
  const saved=JSON.parse(sessionStorage.getItem(key)||'{}');
  const ouro=pack==='Ouro';
  el('adicionais').querySelector('p').textContent=(ouro?'O e-book Kindle em EPUB já faz parte do Ouro. ':'')+'Todos os adicionais são opcionais e realizados com auxílio de IA e supervisão humana.';
+ const sectionDoi=document.createElement('section');
+ sectionDoi.className='entregas';
+ sectionDoi.innerHTML=`<h2>Registro DOI via Crossref</h2><p>Escolha um registro para a obra completa, registros individuais para os capítulos ou ambos.</p>
+ <fieldset><legend>DOI do livro</legend><label><input type="checkbox" id="doi" style="width:auto"> Registrar a obra completa · R$ 40,00</label><p>Até 10 autores incluídos. A partir do 11º, some R$ 9,90 por autor excedente.</p><label id="grupoAutores" hidden>Autores no registro do livro<input type="number" min="1" step="1" id="autoresLivro"></label></fieldset>
+ <fieldset><legend>DOI por capítulo</legend><label><input type="checkbox" id="doiCap" style="width:auto"> Registrar capítulos · R$ 22,90 cada</label><p>Cada capítulo inclui até 10 autores. O excedente custa R$ 9,90 por autor naquele capítulo.</p>
+ <div id="grupoCap" hidden><label>Quantidade de capítulos que receberão DOI<input type="number" min="1" step="1" id="capitulos"></label><details><summary>Algum capítulo tem mais de 10 autores?</summary><p>Indique apenas os capítulos com excedente e o número total de autores em cada um.</p><div id="excedentes"></div><button type="button" id="maisCap">Adicionar capítulo com excedente</button></details></div></fieldset>`;
+ el('extras').before(sectionDoi);
+ el('doi').checked=Boolean(saved.doi);el('doiCap').checked=Boolean(saved.doiCap);
+ el('autoresLivro').value=saved.autoresLivro||1;el('capitulos').value=saved.capitulos||1;
+ function linhaCap(numero='',autores=11){
+  const row=document.createElement('div');
+  row.innerHTML='<label>Número do capítulo<input type="number" min="1" step="1"></label><label>Total de autores neste capítulo<input type="number" min="11" step="1"></label><button type="button">Remover</button>';
+  const [n,a]=row.querySelectorAll('input');n.value=numero;a.value=autores;
+  row.querySelector('button').onclick=()=>{row.remove();atualizar()};
+  el('excedentes').append(row);
+ }
+ for(const pair of saved.excedentes||[])linhaCap(...pair);
+ el('maisCap').onclick=()=>{linhaCap();atualizar()};
+ sectionDoi.addEventListener('input',()=>atualizar());
  const extras=[
-  ['doi','Registro DOI via Crossref',4000,'Identificador permanente da obra. A Worges aceita até 10 pessoas nos créditos de cada registro.'],
   ['abnt','Normalização ABNT',12990,'Padronização da apresentação do texto, das citações e das referências.'],
   ['revisao','Revisão ortográfica e gramatical',ouro?0:12000,'Correção de ortografia, pontuação e concordância.'],
   ['copidesque','Copidesque',18990,'Preparação de texto com ajustes de clareza, fluidez e coerência. Valor único por obra.']
@@ -34,6 +52,25 @@ if(Object.hasOwn(rates,pack)){
   const selecao={faixa:el('faixa').value,kdp:formato[0]};
   const linhas=['Pacote com 40% de desconto: '+dinheiro(rates[pack]),'Acréscimo por páginas: '+dinheiro(paginas)];
   let total=rates[pack]+paginas+formato[2];
+  el('grupoAutores').hidden=!el('doi').checked;el('grupoCap').hidden=!el('doiCap').checked;
+  const autores=Number(el('autoresLivro').value),caps=Number(el('capitulos').value);
+  const excedentes=Array.from(el('excedentes').children,row=>Array.from(row.querySelectorAll('input'),i=>Number(i.value)));
+  Object.assign(selecao,{doi:el('doi').checked,doiCap:el('doiCap').checked,autoresLivro:autores,capitulos:caps,excedentes});
+  const inteiro=n=>Number.isSafeInteger(n)&&n>=1;
+  const ids=new Set();let valido=true;
+  if(selecao.doi){
+   valido=inteiro(autores);const extra=Math.max(0,autores-10)*990;
+   linhas.push('DOI do livro: '+dinheiro(4000));if(extra)linhas.push('Autores excedentes do livro: '+dinheiro(extra));total+=4000+extra;
+  }
+  if(selecao.doiCap){
+   valido=valido&&inteiro(caps);linhas.push(caps+' DOI(s) de capítulos: '+dinheiro(caps*2290));total+=caps*2290;
+   for(const [n,a] of excedentes){
+    if(!inteiro(n)||n>caps||ids.has(n)||!inteiro(a)||a<11)valido=false;
+    ids.add(n);const extra=(a-10)*990;linhas.push('Capítulo '+n+' · '+(a-10)+' autor(es) excedente(s): '+dinheiro(extra));total+=extra;
+   }
+  }
+  el('comprar').disabled=!valido||Boolean(sessionStorage.getItem('worges-login'));
+  if(!valido){el('memoria').textContent='Confira as quantidades. Informe capítulos distintos dentro da quantidade selecionada e pelo menos 11 autores em cada capítulo com excedente.';return}
   for(const [id,nome,valor] of extras){if(!valor)continue;selecao[id]=el(id).checked;if(selecao[id]&&valor){linhas.push(nome+': '+dinheiro(valor));total+=valor}}
   if(formato[2])linhas.push(formato[1]+': '+dinheiro(formato[2]));
   el('memoria').textContent=[...linhas,'Total: '+dinheiro(total)].join('\n');
