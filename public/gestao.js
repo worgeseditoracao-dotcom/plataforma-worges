@@ -16,6 +16,7 @@ async function request(path,method='GET',body,raw=false,extra={}){
  const r=await fetch(host+path,{method,headers,body:raw?body:body?JSON.stringify(body):undefined,cache:'no-store'});
  if(!r.ok && path.startsWith('/auth/')){
   const detail=await r.json().catch(()=>({}));
+  if(detail.error_code==='email_not_confirmed' && $('reenviarAntigo'))$('reenviarAntigo').hidden=false;
   const reasons={email_not_confirmed:'Confirme o e-mail antes de entrar. Você pode reenviar o link abaixo.',invalid_credentials:'Confira o e-mail e a senha.',weak_password:'Escolha uma senha mais forte, com pelo menos 8 caracteres.',signup_disabled:'O cadastro está temporariamente indisponível.'};
   throw Error(reasons[detail.error_code]||(r.status===429?'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.':'Não foi possível concluir o acesso. Confira os dados e tente novamente.'));
  }
@@ -156,7 +157,7 @@ async function recoveryForm(token){
 }
 async function startDesk(){
  offerRecovery();
- const resend=element('button','Reenviar e-mail de confirmação');resend.type='button';$('login').append(resend);
+ const resend=element('button','Reenviar e-mail de confirmação');resend.type='button';resend.id='reenviarAntigo';resend.hidden=true;$('login').append(resend);
  resend.onclick=async()=>{
   const email=$('login').elements.email;if(!email.reportValidity())return;
   resend.disabled=true;
