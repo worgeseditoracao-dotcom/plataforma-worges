@@ -35,10 +35,10 @@ $('heading').textContent=admin?'Administração editorial':'Meus projetos';
 $('login').onsubmit=e=>{e.preventDefault();login(false).catch(onError)};
 $('signup').onclick=()=>login(true).catch(onError);
 $('logout').onclick=async()=>{try{await request('/auth/v1/logout','POST')}finally{sessionStorage.removeItem('worges-login');location.reload()}};
-const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
+const fields=[['obra','Título da obra','text'],['autor','Nome do autor','text'],['email','E-mail de acesso do autor','email'],['whatsapp','WhatsApp com DDD','tel'],['pacote','Pacote contratado','text'],['data_projeto','Data do projeto','date'],['original_final_em','Recebimento do original final','date'],['revisao_adicional','Revisão adicional contratada','checkbox'],['revisao_enviada_em','Revisão enviada ao autor (inicia a pausa)','date'],['revisao_devolvida_em','Resposta do autor recebida (retoma o prazo)','date'],['prazo','Publicação prevista pela equipe','date'],['andamento','Andamento da obra','text'],['valor','Valor pago (R$)','number']];
 for(const [name,title,type] of fields){
  const label=element('label',title),input=document.createElement('input');input.name=name;input.type=type;
- input.required=!['prazo','whatsapp','original_final_em','revisao_adicional'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
+ input.required=!['revisao_enviada_em','revisao_devolvida_em','prazo','whatsapp','original_final_em','revisao_adicional'].includes(name);if(name==='valor'){input.min='0';input.step='0.01'}
  label.append(input);$('fields').append(label);
 }
 function reset(){editing=null;HTMLFormElement.prototype.reset.call($('project'));$('project').elements.valor.value='0';$('project').elements.andamento.value='Recebido';$('project').elements.data_projeto.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});}
@@ -46,6 +46,7 @@ $('reset').onclick=reset;
 $('project').onsubmit=async e=>{
  e.preventDefault();const f=e.target,data=Object.fromEntries(new FormData(f));
  data.email=data.email.trim().toLowerCase();data.pago_centavos=Math.round(Number(data.valor)*100);delete data.valor;
+ for(const key of ['revisao_enviada_em','revisao_devolvida_em'])data[key]=data[key]||null;
  if(!data.prazo)data.prazo=null;if(!data.original_final_em)data.original_final_em=null;data.revisao_adicional=f.elements.revisao_adicional.checked;
  try{await request('/rest/v1/projetos_painel'+(editing?'?id=eq.'+editing:''),editing?'PATCH':'POST',data);reset();$('editor').open=false;await loadProjects();tell('Projeto salvo.')}catch(err){onError(err)}
 };
@@ -66,7 +67,8 @@ function calendario(rows){
  const section=element('section','');section.append(element('h2',admin?'Cronograma editorial da equipe':'Meu cronograma editorial'));
  const eventos=[];
  for(const p of rows){const c=p.cronograma;if(!c)continue;
- for(const [campo,nome] of [['revisao','Entrega do texto revisado'],['diagramacao','Entrega do livro diagramado'],['publicacao','Publicação prevista']])if(c[campo])eventos.push({data:c[campo],obra:p.obra,nome,provisorio:c.provisorio});
+ if(c.pausado)section.append(element('p',p.obra+' · Aguardando análise do autor. Prazo pausado. Saldo para a diagramação: '+c.saldo_diagramacao+' dia(s) útil(eis).'));
+ for(const [campo,nome] of [['capa','Duas propostas de capa'],['revisao','Entrega do texto revisado'],['diagramacao','Entrega do livro diagramado'],['publicacao','Publicação prevista']])if(c[campo])eventos.push({data:c[campo],obra:p.obra,nome,provisorio:c.provisorio});
  }
  if(!eventos.length)section.append(element('p','As previsões aparecem após o registro do pagamento.'));
  else{const ol=element('ol','');for(const e of eventos.sort((a,b)=>a.data.localeCompare(b.data))){const li=element('li','');li.append(element('strong',e.data.split('-').reverse().join('/')+' · '+e.nome),element('p',e.obra+(e.provisorio?' · Previsão inicial, aguardando original final.':'')));ol.append(li)}section.append(ol)}
